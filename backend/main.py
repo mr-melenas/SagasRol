@@ -1,0 +1,207 @@
+from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import OAuth2PasswordRequestForm
+from sqlalchemy.orm import Session
+from datetime import timedelta
+import socketio
+from typing import List
+
+try:
+    from . import models, database, schemas, auth
+except ImportError:
+    import models, database, schemas, auth
+
+models.Base.metadata.create_all(bind=database.engine)
+
+app = FastAPI(title="ROL-Sagas")
+
+# CORS Configuration
+origins = [
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "*"
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Socket.IO Setup
+sio = socketio.AsyncServer(async_mode='asgi', cors_allowed_origins='*')
+socket_app = socketio.ASGIApp(sio, app)
+
+@app.get("/")
+def read_root():
+    return {"message": "Welcome to ROL-Sagas API"}
+
+# Auth Endpoints
+@app.post("/token", response_model=schemas.Token)
+async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(database.get_db)):
+    user = db.query(models.User).filter(models.User.username == form_data.username).first()
+    if not user or not auth.verify_password(form_data.password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    access_token_expires = timedelta(minutes=auth.ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = auth.create_access_token(
+        data={"sub": user.username}, expires_delta=access_token_expires
+    )
+    return {"access_token": access_token, "token_type": "bearer"}
+
+@app.post("/users/", response_model=schemas.User)
+def create_user(user: schemas.UserCreate, db: Session = Depends(database.get_db)):
+    db_user = db.query(models.User).filter(models.User.username == user.username).first()
+    if db_user:
+        raise HTTPException(status_code=400, detail="Username already registered")
+    hashed_password = auth.get_password_hash(user.password)
+    db_user = models.User(username=user.username, hashed_password=hashed_password, role=user.role)
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+    return db_user
+
+@app.get("/users/me/", response_model=schemas.User)
+async def read_users_me(current_user: models.User = Depends(auth.get_current_user)):
+    return current_user
+
+# Campaign Endpoints
+@app.post("/campaigns/", response_model=schemas.Campaign)
+def create_campaign(campaign: schemas.CampaignCreate, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
+    if current_user.role != models.UserRole.GM:
+        raise HTTPException(status_code=403, detail="Only GMs can create campaigns")
+    db_campaign = models.Campaign(name=campaign.name, gm_id=current_user.id)
+    db.add(db_campaign)
+    db.commit()
+    db.refresh(db_campaign)
+    return db_campaign
+
+@app.get("/campaigns/", response_model=List[schemas.Campaign])
+def read_campaigns(db: Session = Depends(database.get_db)):
+    return db.query(models.Campaign).all()
+
+# Character Endpoints
+@app.post("/characters/", response_model=schemas.Character)
+def create_character(character: schemas.CharacterCreate, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
+    db_character = models.Character(**character.dict(), user_id=current_user.id)
+    db.add(db_character)
+    db.commit()
+    db.refresh(db_character)
+    return db_character
+
+def recalculate_stats(character: models.Character, db: Session):
+    base_stats = character.stats.copy() if character.stats else {}
+    equipped_items = db.query(models.Inventory).filter(
+        models.Inventory.character_id == character.id,
+        models.Inventory.location == models.InventoryLocation.EQUIPPED
+    ).all()
+
+    for entry in equipped_items:
+        item = entry.item
+        if item.stats_modifier:
+            for stat, value in item.stats_modifier.items():
+                if stat in base_stats:
+                    base_stats[stat] += value
+                else:
+                    base_stats[stat] = value
+    return base_stats
+
+@app.get("/characters/{character_id}", response_model=schemas.Character)
+def read_character(character_id: int, db: Session = Depends(database.get_db)):
+    character = db.query(models.Character).filter(models.Character.id == character_id).first()
+    if not character:
+        raise HTTPException(status_code=404, detail="Character not found")
+    
+    # Calculate effective stats
+    effective_stats = recalculate_stats(character, db)
+    # We return the character object but patch the stats for response
+    # Note: This doesn't save to DB, just for display. 
+    # To properly return this via Pydantic, we might need a separate schema or just override the dict
+    character.stats = effective_stats 
+    return character
+
+# Inventory Endpoints
+@app.post("/characters/{character_id}/inventory/", response_model=schemas.InventoryItem)
+def add_item_to_inventory(character_id: int, item_data: schemas.InventoryAdd, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
+    character = db.query(models.Character).filter(models.Character.id == character_id).first()
+    if not character:
+        raise HTTPException(status_code=404, detail="Character not found")
+    if character.user_id != current_user.id and current_user.role != models.UserRole.GM:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    db_inventory = models.Inventory(
+        character_id=character_id,
+        item_id=item_data.item_id,
+        location=item_data.location,
+        quantity=item_data.quantity
+    )
+    db.add(db_inventory)
+    db.commit()
+    db.refresh(db_inventory)
+    return db_inventory
+
+@app.put("/inventory/{inventory_id}/move", response_model=schemas.InventoryItem)
+def move_inventory_item(inventory_id: int, update: schemas.InventoryUpdate, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
+    inventory_item = db.query(models.Inventory).filter(models.Inventory.id == inventory_id).first()
+    if not inventory_item:
+        raise HTTPException(status_code=404, detail="Inventory item not found")
+    
+    # Check permission
+    character = inventory_item.character
+    if character.user_id != current_user.id and current_user.role != models.UserRole.GM:
+         raise HTTPException(status_code=403, detail="Not authorized")
+
+    inventory_item.location = update.location
+    db.commit()
+    db.refresh(inventory_item)
+    return inventory_item
+
+@app.get("/characters/{character_id}/inventory", response_model=List[schemas.InventoryItem])
+def read_inventory(character_id: int, db: Session = Depends(database.get_db)):
+    return db.query(models.Inventory).filter(models.Inventory.character_id == character_id).all()
+
+# Items (for testing)
+@app.post("/items/", response_model=schemas.Item)
+def create_item(item: schemas.ItemCreate, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
+    if current_user.role != models.UserRole.GM:
+        raise HTTPException(status_code=403, detail="Only GMs can create items")
+    db_item = models.Item(**item.dict())
+    db.add(db_item)
+    db.commit()
+    db.refresh(db_item)
+    return db_item
+
+# Socket.IO Events
+@sio.event
+async def connect(sid, environ):
+    print(f"connect {sid}")
+
+@sio.event
+async def disconnect(sid):
+    print(f"disconnect {sid}")
+
+@sio.event
+async def join_room(sid, data):
+    # data: {'room': 'campaign_id'}
+    room = data.get('room')
+    if room:
+        sio.enter_room(sid, room)
+        await sio.emit('message', {'data': f'User {sid} joined room {room}'}, room=room)
+
+@sio.event
+async def roll_dice(sid, data):
+    # data: {'room': 'campaign_id', 'dice': '1d20'}
+    import random
+    room = data.get('room')
+    dice_str = data.get('dice', '1d20')
+    try:
+        count, sides = map(int, dice_str.split('d'))
+        result = sum(random.randint(1, sides) for _ in range(count))
+        await sio.emit('dice_result', {'user': sid, 'roll': result, 'formula': dice_str}, room=room)
+    except Exception as e:
+        await sio.emit('error', {'message': 'Invalid dice format'}, room=sid)
