@@ -1,0 +1,130 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Enums
+enum UserRole {
+  GM
+  PLAYER
+}
+
+enum InventoryLocation {
+  EQUIPPED
+  BACKPACK
+  STASH
+}
+
+enum DowntimeStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// Models
+model User {
+  id          String   @id // Clerk ID
+  username    String?
+  email       String?  @unique
+  avatar_url  String?
+  role        UserRole @default(PLAYER)
+  
+  // Relations
+  gm_campaigns   Campaign[]  @relation("GMCampaigns")
+  characters     Character[] @relation("PlayerCharacters")
+
+  @@map("users")
+}
+
+model Campaign {
+  id      Int    @id @default(autoincrement())
+  name    String
+  gm_id   String
+  
+  // Relations
+  gm          User        @relation("GMCampaigns", fields: [gm_id], references: [id])
+  characters  Character[]
+  items       Item[]
+  sessions    Session[]
+
+  @@map("campaigns")
+}
+
+model Character {
+  id          Int      @id @default(autoincrement())
+  name        String
+  user_id     String
+  campaign_id Int
+  stats       Json?    // e.g., {"strength": 10, "magic": 5}
+  image_url   String?
+
+  // Relations
+  player           User             @relation("PlayerCharacters", fields: [user_id], references: [id])
+  campaign         Campaign         @relation(fields: [campaign_id], references: [id])
+  inventory        Inventory[]
+  downtime_actions DowntimeAction[]
+
+  @@map("characters")
+}
+
+model Item {
+  id             Int     @id @default(autoincrement())
+  name           String
+  description    String?
+  campaign_id    Int
+  stats_modifier Json?   // e.g., {"strength": +2}
+
+  // Relations
+  campaign          Campaign    @relation(fields: [campaign_id], references: [id])
+  inventory_entries Inventory[]
+
+  @@map("items")
+}
+
+model Inventory {
+  id           Int               @id @default(autoincrement())
+  character_id Int
+  item_id      Int
+  location     InventoryLocation @default(BACKPACK)
+  quantity     Int               @default(1)
+
+  // Relations
+  character Character @relation(fields: [character_id], references: [id])
+  item      Item      @relation(fields: [item_id], references: [id])
+
+  @@map("inventory")
+}
+
+model Session {
+  id          Int      @id @default(autoincrement())
+  campaign_id Int
+  log         String?  @db.Text
+  date        DateTime @default(now())
+  summary     String?  @db.Text
+
+  // Relations
+  campaign Campaign @relation(fields: [campaign_id], references: [id])
+
+  @@map("sessions")
+}
+
+model DowntimeAction {
+  id           Int            @id @default(autoincrement())
+  character_id Int
+  action_type  String
+  input_data   String
+  status       DowntimeStatus @default(PENDING)
+  result       String?        @db.Text
+  created_at   DateTime       @default(now())
+
+  // Relations
+  character Character @relation(fields: [character_id], references: [id])
+
+  @@map("downtime_actions")
+}

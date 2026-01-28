@@ -3,15 +3,16 @@ import { useParams } from 'react-router-dom';
 import { Inventory } from '../components/Inventory';
 import { Character, InventoryLocation } from '../types';
 import axios from 'axios';
-import { useStore } from '../store/useStore';
+import { useAuth } from '@clerk/clerk-react';
 
 export const CharacterSheet: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const [character, setCharacter] = useState<Character | null>(null);
-  const { token } = useStore();
+  const { getToken } = useAuth();
 
   const fetchCharacter = async () => {
     try {
+      const token = await getToken();
       const res = await axios.get(`http://localhost:8000/characters/${id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -22,11 +23,12 @@ export const CharacterSheet: React.FC = () => {
   };
 
   useEffect(() => {
-    if (id && token) fetchCharacter();
-  }, [id, token]);
+    if (id) fetchCharacter();
+  }, [id]);
 
   const handleMoveItem = async (inventoryId: number, newLocation: InventoryLocation) => {
     try {
+      const token = await getToken();
       await axios.put(`http://localhost:8000/inventory/${inventoryId}/move`, 
         { location: newLocation },
         { headers: { Authorization: `Bearer ${token}` } }

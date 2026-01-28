@@ -1,56 +1,98 @@
-from datetime import datetime, timedelta
-from typing import Optional
-from jose import JWTError, jwt
-from passlib.context import CryptContext
+import jwt
+from jwt.algorithms import RSAAlgorithm
+import requests
+import json
 from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 try:
     from . import schemas, database, models
 except ImportError:
     import schemas, database, models
 
-# openssl rand -hex 32
-SECRET_KEY = "09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7"
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+# Configuration
+CLERK_ISSUER = "https://fun-sloth-43.clerk.accounts.dev"  # Replace with your Clerk Issuer URL
+JWKS_URL = f"{CLERK_ISSUER}/.well-known/jwks.json"
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+security = HTTPBearer()
 
-def verify_password(plain_password, hashed_password):
-    return pwd_context.verify(plain_password, hashed_password)
-
-def get_password_hash(password):
-    return pwd_context.hash(password)
-
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
-    to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.utcnow() + expires_delta
-    else:
-        expire = datetime.utcnow() + timedelta(minutes=15)
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
-
-async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(database.get_db)):
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
+def get_jwks():
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username: str = payload.get("sub")
-        if username is None:
-            raise credentials_exception
-        token_data = schemas.TokenData(username=username)
-    except JWTError:
-        raise credentials_exception
-    user = db.query(models.User).filter(models.User.username == token_data.username).first()
-    if user is None:
-        raise credentials_exception
+        response = requests.get(JWKS_URL)
+        response.raise_for_status()
+        return response.json()
+    except Exception as e:
+        print(f"Error fetching JWKS: {e}")
+        return None
+
+def verify_clerk_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    token = credentials.credentials
+    try:
+        # Get Key ID from token header
+        header = jwt.get_unverified_header(token)
+        kid = header.get("kid")
+        
+        jwks = get_jwks()
+        if not jwks:
+             raise HTTPException(status_code=500, detail="Could not verify token configuration")
+
+        # Find the correct key
+        key = None
+        for k in jwks["keys"]:
+            if k["kid"] == kid:
+                key = k
+                break
+        
+        if not key:
+            raise HTTPException(status_code=401, detail="Invalid token key")
+
+        # Construct public key
+        public_key = RSAAlgorithm.from_jwk(json.dumps(key))
+        
+        # Verify token
+        payload = jwt.decode(
+            token,
+            public_key,
+            algorithms=["RS256"],
+            audience="authenticated", # Default audience for Clerk
+            issuer=CLERK_ISSUER
+        )
+        return payload
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token has expired")
+    except jwt.InvalidTokenError as e:
+        raise HTTPException(status_code=401, detail=f"Invalid token: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=401, detail="Could not validate credentials")
+
+def get_current_user(payload: dict = Depends(verify_clerk_token), db: Session = Depends(database.get_db)):
+    clerk_user_id = payload.get("sub")
+    if not clerk_user_id:
+        raise HTTPException(status_code=401, detail="Invalid token payload")
+
+    # Check if user exists in our DB, if not create/sync
+    user = db.query(models.User).filter(models.User.id == clerk_user_id).first()
+    
+    if not user:
+        # Create new user mapped to Clerk ID
+        # Extract additional info if available (though 'sub' is the only guaranteed claim in standard JWT)
+        # We might need to fetch user details from Clerk API if we want email/username here, 
+        # or rely on frontend to send it, but for Lazy Sync 'id' is enough to start.
+        
+        # NOTE: Clerk JWTs might not contain email/username by default unless customized. 
+        # For this implementation, we initialize with what we have.
+        
+        user = models.User(
+            id=clerk_user_id,
+            username=payload.get("username"), # Might be None
+            email=payload.get("email"), # Might be None
+            avatar_url=payload.get("image_url"), # Might be None
+            role=models.UserRole.PLAYER
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+        
     return user
 
 async def get_current_active_gm(current_user: models.User = Depends(get_current_user)):

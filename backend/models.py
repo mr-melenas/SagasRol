@@ -23,9 +23,10 @@ class DowntimeStatus(str, enum.Enum):
 
 class User(Base):
     __tablename__ = "users"
-    id = Column(Integer, primary_key=True, index=True)
-    username = Column(String, unique=True, index=True)
-    hashed_password = Column(String)
+    id = Column(String, primary_key=True, index=True) # Changed from Integer to String for Clerk ID
+    username = Column(String, nullable=True) # Nullable, handled by Clerk
+    email = Column(String, unique=True, index=True, nullable=True) # Added email
+    avatar_url = Column(String, nullable=True) # Added avatar_url
     role = Column(Enum(UserRole), default=UserRole.PLAYER)
 
     campaigns = relationship("Campaign", back_populates="gm")
@@ -35,7 +36,7 @@ class Campaign(Base):
     __tablename__ = "campaigns"
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, index=True)
-    gm_id = Column(Integer, ForeignKey("users.id"))
+    gm_id = Column(String, ForeignKey("users.id")) # Changed to String
 
     gm = relationship("User", back_populates="campaigns")
     characters = relationship("Character", back_populates="campaign")
@@ -46,7 +47,7 @@ class Character(Base):
     __tablename__ = "characters"
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"))
+    user_id = Column(String, ForeignKey("users.id")) # Changed to String
     campaign_id = Column(Integer, ForeignKey("campaigns.id"))
     stats = Column(JSON) # e.g., {"strength": 10, "magic": 5}
     image_url = Column(String, nullable=True)

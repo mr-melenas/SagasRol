@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { getSocket, connectSocket, disconnectSocket } from '../services/socket';
-import { useStore } from '../store/useStore';
+import { useAuth, useUser } from '@clerk/clerk-react';
 
 interface LogMessage {
   user?: string;
@@ -13,45 +13,53 @@ interface LogMessage {
 
 export const GameRoom: React.FC = () => {
   const { campaignId } = useParams<{ campaignId: string }>();
-  const { user, token } = useStore();
+  const { getToken } = useAuth();
+  const { user } = useUser();
   const [logs, setLogs] = useState<LogMessage[]>([]);
   const [diceInput, setDiceInput] = useState('1d20');
   const logsEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (token) {
-      const socket = connectSocket(token);
+    const initSocket = async () => {
+        const token = await getToken();
+        if (token) {
+            const socket = connectSocket(token);
 
-      socket.emit('join_room', { room: campaignId });
+            socket.emit('join_room', { room: campaignId });
 
-      socket.on('message', (data: any) => {
-        setLogs(prev => [...prev, { type: 'system', message: data.data }]);
-      });
+            socket.on('message', (data: any) => {
+                setLogs(prev => [...prev, { type: 'system', message: data.data }]);
+            });
 
-      socket.on('dice_result', (data: any) => {
-        setLogs(prev => [...prev, { 
-          type: 'roll', 
-          user: data.user, 
-          roll: data.roll, 
-          formula: data.formula 
-        }]);
-      });
+            socket.on('dice_result', (data: any) => {
+                setLogs(prev => [...prev, { 
+                type: 'roll', 
+                user: data.user, 
+                roll: data.roll, 
+                formula: data.formula 
+                }]);
+            });
 
-      socket.on('error', (data: any) => {
-        alert(data.message);
-      });
+            socket.on('error', (data: any) => {
+                alert(data.message);
+            });
+        }
+    };
+    initSocket();
 
-      return () => {
-        socket.off('message');
-        socket.off('dice_result');
-        disconnectSocket();
-      };
-    }
-  }, [campaignId, token]);
+    return () => {
+      // Clean up listeners if needed, but disconnect handles socket closure
+      // socket.off('message');
+      // socket.off('dice_result');
+      disconnectSocket();
+    };
+  }, [campaignId, getToken]);
 
   const handleRoll = () => {
     const socket = getSocket();
-    socket.emit('roll_dice', { room: campaignId, dice: diceInput });
+    if (socket) {
+        socket.emit('roll_dice', { room: campaignId, dice: diceInput });
+    }
   };
 
   return (
