@@ -8,7 +8,7 @@ load_dotenv()
 
 # Use an environment variable for the DB URL
 # Format for Supabase: postgresql://postgres:[PASSWORD]@db.[REF].supabase.co:5432/postgres
-SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./sql_app.db")
+SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL")
 
 # Handle "postgres://" vs "postgresql://" for SQLAlchemy
 if SQLALCHEMY_DATABASE_URL.startswith("postgres://"):

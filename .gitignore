@@ -123,3 +123,5 @@ backend/venv
 backend/__pycache__
 *.pyc
 *.db
+
+/generated/prisma

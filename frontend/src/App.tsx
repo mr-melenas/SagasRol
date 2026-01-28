@@ -7,8 +7,37 @@ import {
   SignInButton, 
   UserButton,
   RedirectToSignIn,
-  useUser
+  useUser,
+  useAuth
 } from "@clerk/clerk-react";
+import { useEffect } from 'react';
+import axios from 'axios';
+
+// Component to sync Clerk user with Backend
+function AuthSync() {
+  const { getToken } = useAuth();
+  const { user } = useUser();
+
+  useEffect(() => {
+    const syncUser = async () => {
+      if (user) {
+        try {
+          const token = await getToken();
+          // Call a protected endpoint to trigger Lazy Sync in backend
+          await axios.get('http://localhost:8000/users/me/', {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          console.log("User synced with backend");
+        } catch (err) {
+          console.error("Failed to sync user with backend", err);
+        }
+      }
+    };
+    syncUser();
+  }, [user, getToken]);
+
+  return null;
+}
 
 function Dashboard() {
   const { user } = useUser();
@@ -50,6 +79,11 @@ function App() {
         </div>
       </header>
       
+      {/* AuthSync will only run when user is signed in */}
+      <SignedIn>
+        <AuthSync />
+      </SignedIn>
+
       <Routes>
         <Route 
           path="/" 
