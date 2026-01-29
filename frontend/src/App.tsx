@@ -41,19 +41,68 @@ function AuthSync() {
 
 function Dashboard() {
   const { user } = useUser();
+  const { getToken } = useAuth();
   
+  const handleCreateCampaign = () => {
+    // Logic to open create campaign modal or navigate to create campaign page
+    console.log("Create campaign clicked");
+  };
+
+  const handleJoinCampaign = () => {
+    // Logic to open join campaign modal
+    console.log("Join campaign clicked");
+  };
+
+  const handleCreateUniverse = () => {
+    // Logic to open create universe modal
+    console.log("Create universe clicked");
+  };
+
   return (
     <div className="p-8">
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-2xl">Welcome, {user?.firstName || user?.username || "Traveler"}</h1>
-        <UserButton />
-      </div>
-      <div className="grid grid-cols-2 gap-4">
-        <div className="border p-4 rounded hover:shadow cursor-pointer">
-          <h3 className="font-bold">Campaigns</h3>
-          <p>Join or continue a campaign</p>
-          {/* List campaigns here */}
+        <div className="flex gap-4 items-center">
+             {/* UserButton removed from here as it is already in the header */}
         </div>
+      </div>
+      <div className="grid grid-cols-3 gap-4"> {/* Changed from grid-cols-2 to grid-cols-3 */}
+        <div className="border p-4 rounded hover:shadow cursor-pointer flex flex-col gap-4">
+          <div>
+              <h3 className="font-bold">Campaigns</h3>
+              <p>Join or continue a campaign</p>
+          </div>
+          <div className="flex gap-2 mt-auto">
+            <button 
+                onClick={handleCreateCampaign}
+                className="bg-green-600 text-white px-3 py-1 text-sm rounded hover:bg-green-700 transition-colors flex-1"
+            >
+                Create
+            </button>
+            <button 
+                onClick={handleJoinCampaign}
+                className="bg-blue-600 text-white px-3 py-1 text-sm rounded hover:bg-blue-700 transition-colors flex-1"
+            >
+                Join
+            </button>
+          </div>
+        </div>
+
+        <div className="border p-4 rounded hover:shadow cursor-pointer flex flex-col gap-4">
+          <div>
+              <h3 className="font-bold">Universe</h3>
+              <p>Create and manage your worlds</p>
+          </div>
+          <div className="flex gap-2 mt-auto">
+            <button 
+                onClick={handleCreateUniverse}
+                className="bg-purple-600 text-white px-3 py-1 text-sm rounded hover:bg-purple-700 transition-colors flex-1"
+            >
+                Create Universe
+            </button>
+          </div>
+        </div>
+
         <div className="border p-4 rounded hover:shadow cursor-pointer">
           <h3 className="font-bold">My Characters</h3>
           <p>Manage your heroes</p>

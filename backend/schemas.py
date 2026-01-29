@@ -13,7 +13,7 @@ class TokenData(BaseModel):
     username: Optional[str] = None
 
 class UserBase(BaseModel):
-    username: str
+    username: Optional[str] = None # Username is now optional
 
 class UserCreate(UserBase):
     password: str
