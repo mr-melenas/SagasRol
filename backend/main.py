@@ -1,19 +1,27 @@
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from datetime import timedelta
 import socketio
 from typing import List
+import os
 
 try:
     from . import models, database, schemas, auth
+    from .routers import universes
 except ImportError:
     import models, database, schemas, auth
+    from routers import universes
 
 models.Base.metadata.create_all(bind=database.engine)
 
 app = FastAPI(title="ROL-Sagas")
+
+# Mount Static Files for Uploads
+os.makedirs("uploads/assets", exist_ok=True)
+app.mount("/static", StaticFiles(directory="uploads"), name="static")
 
 # CORS Configuration
 origins = [
@@ -33,6 +41,9 @@ app.add_middleware(
 # Socket.IO Setup
 sio = socketio.AsyncServer(async_mode='asgi', cors_allowed_origins='*')
 socket_app = socketio.ASGIApp(sio, app)
+
+# Include Routers
+app.include_router(universes.router, tags=["universes"])
 
 @app.get("/")
 def read_root():

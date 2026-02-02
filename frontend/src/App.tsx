@@ -1,6 +1,7 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { GameRoom } from './pages/GameRoom';
 import { CharacterSheet } from './pages/CharacterSheet';
+import { CreateUniverse } from './pages/CreateUniverse';
 import { 
   SignedIn, 
   SignedOut, 
@@ -41,7 +42,7 @@ function AuthSync() {
 
 function Dashboard() {
   const { user } = useUser();
-  const { getToken } = useAuth();
+  const navigate = useNavigate();
   
   const handleCreateCampaign = () => {
     // Logic to open create campaign modal or navigate to create campaign page
@@ -54,8 +55,7 @@ function Dashboard() {
   };
 
   const handleCreateUniverse = () => {
-    // Logic to open create universe modal
-    console.log("Create universe clicked");
+    navigate('/create-universe');
   };
 
   return (
@@ -161,6 +161,16 @@ function App() {
             <>
               <SignedOut><RedirectToSignIn /></SignedOut>
               <SignedIn><Dashboard /></SignedIn>
+            </>
+          } 
+        />
+
+        <Route 
+          path="/create-universe" 
+          element={
+            <>
+              <SignedOut><RedirectToSignIn /></SignedOut>
+              <SignedIn><CreateUniverse /></SignedIn>
             </>
           } 
         />

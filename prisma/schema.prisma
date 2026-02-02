@@ -27,6 +27,13 @@ enum DowntimeStatus {
   REJECTED
 }
 
+enum AssetType {
+  SCENE
+  NPC
+  ENEMY
+  ITEM
+}
+
 // Models
 model User {
   id          String   @id // Clerk ID
@@ -38,17 +45,52 @@ model User {
   // Relations
   gm_campaigns   Campaign[]  @relation("GMCampaigns")
   characters     Character[] @relation("PlayerCharacters")
+  universes      Universe[]  @relation("GMUniverses")
 
   @@map("users")
 }
 
+model Universe {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?  @db.Text
+  cover_url   String?
+  gm_id       String
+  
+  // Configuration for character sheet and default dice
+  // Example: { "default_dice": "d20", "attributes": ["Strength", "Agility"] }
+  rules_config Json?
+
+  // Relations
+  gm          User     @relation("GMUniverses", fields: [gm_id], references: [id])
+  assets      Asset[]
+  campaigns   Campaign[]
+
+  @@map("universes")
+}
+
+model Asset {
+  id          Int       @id @default(autoincrement())
+  name        String
+  image_url   String
+  type        AssetType
+  universe_id Int
+
+  // Relations
+  universe    Universe  @relation(fields: [universe_id], references: [id])
+
+  @@map("assets")
+}
+
 model Campaign {
-  id      Int    @id @default(autoincrement())
-  name    String
-  gm_id   String
+  id          Int    @id @default(autoincrement())
+  name        String
+  gm_id       String
+  universe_id Int?   // Optional for now to support legacy campaigns
   
   // Relations
   gm          User        @relation("GMCampaigns", fields: [gm_id], references: [id])
+  universe    Universe?   @relation(fields: [universe_id], references: [id])
   characters  Character[]
   items       Item[]
   sessions    Session[]

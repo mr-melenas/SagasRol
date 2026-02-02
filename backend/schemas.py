@@ -1,5 +1,6 @@
 from pydantic import BaseModel
 from typing import List, Optional, Any, Dict
+import enum
 try:
     from .models import UserRole, InventoryLocation, DowntimeStatus
 except ImportError:
@@ -81,3 +82,39 @@ class InventoryAdd(BaseModel):
     item_id: int
     quantity: int = 1
     location: InventoryLocation = InventoryLocation.BACKPACK
+
+# Universe Schemas
+class UniverseBase(BaseModel):
+    name: str
+    description: Optional[str] = None
+    cover_url: Optional[str] = None
+    rules_config: Optional[Dict[str, Any]] = None
+
+class UniverseCreate(UniverseBase):
+    pass
+
+class Universe(UniverseBase):
+    id: int
+    gm_id: str
+    class Config:
+        orm_mode = True
+
+class AssetType(str, enum.Enum): # Should match database Enum
+    SCENE = "SCENE"
+    NPC = "NPC"
+    ENEMY = "ENEMY"
+    ITEM = "ITEM"
+
+class AssetBase(BaseModel):
+    name: str
+    image_url: str
+    type: AssetType
+
+class AssetCreate(AssetBase):
+    universe_id: int
+
+class Asset(AssetBase):
+    id: int
+    universe_id: int
+    class Config:
+        orm_mode = True
