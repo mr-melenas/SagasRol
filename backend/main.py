@@ -8,12 +8,17 @@ import socketio
 from typing import List
 import os
 
-try:
-    from . import models, database, schemas, auth
-    from .routers import universes
-except ImportError:
-    import models, database, schemas, auth
-    from routers import universes
+import sys
+import os
+
+# Ensure root is in path
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
+
+from backend import models, database, schemas, auth
+from backend.routers import universes
 
 models.Base.metadata.create_all(bind=database.engine)
 

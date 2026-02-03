@@ -6,7 +6,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 try:
-    from . import schemas, database, models
+    from backend import schemas, database, models
 except ImportError:
     import schemas, database, models
 

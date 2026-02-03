@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-route
 import { GameRoom } from './pages/GameRoom';
 import { CharacterSheet } from './pages/CharacterSheet';
 import { CreateUniverse } from './pages/CreateUniverse';
+import { UniverseSettings } from './pages/UniverseSettings';
 import { 
   SignedIn, 
   SignedOut, 
@@ -161,7 +162,7 @@ function Dashboard() {
                                 </p>
                                 <button 
                                     className="w-full border border-gray-300 text-gray-600 text-sm py-1 rounded hover:bg-gray-50 hover:text-gray-900 transition-colors"
-                                    onClick={() => console.log(`Manage ${universe.id}`)}
+                                    onClick={() => navigate(`/universe/${universe.id}/edit`)}
                                 >
                                     Manage
                                 </button>
@@ -234,6 +235,16 @@ function App() {
             <>
               <SignedOut><RedirectToSignIn /></SignedOut>
               <SignedIn><CreateUniverse /></SignedIn>
+            </>
+          } 
+        />
+
+        <Route 
+          path="/universe/:id/edit" 
+          element={
+            <>
+              <SignedOut><RedirectToSignIn /></SignedOut>
+              <SignedIn><UniverseSettings /></SignedIn>
             </>
           } 
         />

@@ -6,7 +6,7 @@ import os
 import uuid
 
 try:
-    from . import models, database, schemas, auth
+    from backend import models, database, schemas, auth
 except ImportError:
     import models, database, schemas, auth
 
@@ -33,6 +33,24 @@ def read_universe(universe_id: int, db: Session = Depends(database.get_db)):
     if not universe:
         raise HTTPException(status_code=404, detail="Universe not found")
     return universe
+
+@router.patch("/universes/{universe_id}", response_model=schemas.Universe)
+def update_universe(universe_id: int, universe_update: schemas.UniverseUpdate, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
+    db_universe = db.query(models.Universe).filter(models.Universe.id == universe_id).first()
+    if not db_universe:
+        raise HTTPException(status_code=404, detail="Universe not found")
+    
+    if db_universe.gm_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to edit this universe")
+
+    update_data = universe_update.dict(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(db_universe, key, value)
+
+    db.add(db_universe)
+    db.commit()
+    db.refresh(db_universe)
+    return db_universe
 
 # --- Assets ---
 

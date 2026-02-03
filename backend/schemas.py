@@ -2,7 +2,7 @@ from pydantic import BaseModel
 from typing import List, Optional, Any, Dict
 import enum
 try:
-    from .models import UserRole, InventoryLocation, DowntimeStatus
+    from backend.models import UserRole, InventoryLocation, DowntimeStatus
 except ImportError:
     from models import UserRole, InventoryLocation, DowntimeStatus
 
@@ -91,9 +91,19 @@ class UniverseBase(BaseModel):
     description: Optional[str] = None
     cover_url: Optional[str] = None
     rules_config: Optional[Dict[str, Any]] = None
+    isPublic: bool = True
+    tags: List[str] = []
 
 class UniverseCreate(UniverseBase):
     pass
+
+class UniverseUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    cover_url: Optional[str] = None
+    rules_config: Optional[Dict[str, Any]] = None
+    isPublic: Optional[bool] = None
+    tags: Optional[List[str]] = None
 
 class Universe(UniverseBase):
     id: int

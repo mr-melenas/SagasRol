@@ -1,7 +1,7 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, JSON, Text, DateTime, Boolean, Enum
+from sqlalchemy import Column, Integer, String, ForeignKey, JSON, Text, DateTime, Boolean, Enum, ARRAY
 from sqlalchemy.orm import relationship
 try:
-    from .database import Base
+    from backend.database import Base
 except ImportError:
     from database import Base
 import enum
@@ -49,6 +49,9 @@ class Universe(Base):
     cover_url = Column(String, nullable=True)
     gm_id = Column(String, ForeignKey("users.id"))
     
+    isPublic = Column(Boolean, default=True)
+    tags = Column(ARRAY(String), default=list) # Use ARRAY for PostgreSQL
+
     # Configuration for character sheet and default dice
     rules_config = Column(JSON, nullable=True)
 

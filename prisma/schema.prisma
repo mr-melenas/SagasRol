@@ -58,6 +58,8 @@ model Universe {
   description String?  @db.Text
   cover_url   String?
   gm_id       String
+  isPublic    Boolean  @default(true)
+  tags        String[]
   
   // Configuration for character sheet and default dice
   // Example: { "default_dice": "d20", "attributes": ["Strength", "Agility"] }

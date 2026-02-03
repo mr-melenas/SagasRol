@@ -43,5 +43,23 @@ export interface Universe {
     description?: string;
     cover_url?: string;
     gm_id: string;
+    isPublic: boolean;
+    tags: string[];
+    rules_config?: Record<string, any>;
+}
+
+export enum AssetType {
+    SCENE = "SCENE",
+    NPC = "NPC",
+    ENEMY = "ENEMY",
+    ITEM = "ITEM"
+}
+
+export interface Asset {
+    id: number;
+    name: string;
+    image_url: string;
+    type: AssetType;
+    universe_id: number;
 }
 

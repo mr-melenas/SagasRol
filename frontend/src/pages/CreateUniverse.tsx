@@ -21,11 +21,11 @@ export const CreateUniverse: React.FC = () => {
     description: '',
     coverUrl: '',
     defaultDice: 'd20',
-    attributes: [] as string[]
+    tags: [] as string[]
   });
   
   // Local state for UI
-  const [newAttribute, setNewAttribute] = useState('');
+  const [newTag, setNewTag] = useState('');
   const [assets, setAssets] = useState<File[]>([]);
 
   const handleNext = () => {
@@ -36,15 +36,15 @@ export const CreateUniverse: React.FC = () => {
     setStep(prev => prev - 1);
   };
 
-  const addAttribute = () => {
-    if (newAttribute && !formData.attributes.includes(newAttribute)) {
-      setFormData(prev => ({ ...prev, attributes: [...prev.attributes, newAttribute] }));
-      setNewAttribute('');
+  const addTag = () => {
+    if (newTag && !formData.tags.includes(newTag)) {
+      setFormData(prev => ({ ...prev, tags: [...prev.tags, newTag] }));
+      setNewTag('');
     }
   };
 
-  const removeAttribute = (attr: string) => {
-    setFormData(prev => ({ ...prev, attributes: prev.attributes.filter(a => a !== attr) }));
+  const removeTag = (tagToRemove: string) => {
+    setFormData(prev => ({ ...prev, tags: prev.tags.filter(t => t !== tagToRemove) }));
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -80,9 +80,9 @@ export const CreateUniverse: React.FC = () => {
         name: formData.name,
         description: formData.description,
         cover_url: formData.coverUrl,
+        tags: formData.tags,
         rules_config: {
-            default_dice: formData.defaultDice,
-            attributes: formData.attributes
+            default_dice: formData.defaultDice
         }
       };
 
@@ -174,27 +174,27 @@ export const CreateUniverse: React.FC = () => {
             </div>
 
             <div>
-                <label className="block font-medium mb-1">Character Attributes Template</label>
+                <label className="block font-medium mb-1">Tags (Genres/Themes)</label>
                 <div className="flex gap-2 mb-2">
                     <input 
                         type="text" 
                         className="flex-1 border p-2 rounded"
-                        value={newAttribute}
-                        onChange={e => setNewAttribute(e.target.value)}
-                        placeholder="Add attribute (e.g. Strength)"
-                        onKeyPress={e => e.key === 'Enter' && addAttribute()}
+                        value={newTag}
+                        onChange={e => setNewTag(e.target.value)}
+                        placeholder="Add tag (e.g. Fantasy, Horror)"
+                        onKeyPress={e => e.key === 'Enter' && addTag()}
                     />
-                    <button onClick={addAttribute} className="bg-blue-600 text-white px-4 rounded">Add</button>
+                    <button onClick={addTag} className="bg-blue-600 text-white px-4 rounded">Add</button>
                 </div>
                 
                 <div className="flex flex-wrap gap-2 mt-4">
-                    {formData.attributes.map(attr => (
-                        <span key={attr} className="bg-gray-100 px-3 py-1 rounded-full flex items-center gap-2">
-                            {attr}
-                            <button onClick={() => removeAttribute(attr)} className="text-red-500 font-bold">×</button>
+                    {formData.tags.map(tag => (
+                        <span key={tag} className="bg-purple-100 text-purple-800 px-3 py-1 rounded-full flex items-center gap-2 border border-purple-200">
+                            {tag}
+                            <button onClick={() => removeTag(tag)} className="text-red-500 font-bold hover:text-red-700">×</button>
                         </span>
                     ))}
-                    {formData.attributes.length === 0 && <span className="text-gray-400 italic">No attributes defined yet.</span>}
+                    {formData.tags.length === 0 && <span className="text-gray-400 italic">No tags added yet.</span>}
                 </div>
             </div>
           </div>
