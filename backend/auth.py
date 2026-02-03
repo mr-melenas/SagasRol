@@ -71,24 +71,20 @@ def get_current_user(payload: dict = Depends(verify_clerk_token), db: Session = 
     if not clerk_user_id:
         raise HTTPException(status_code=401, detail="Invalid token payload")
 
-    # Check if user exists in our DB, if not create/sync
+    # Check if user exists in our DB
     user = db.query(models.User).filter(models.User.id == clerk_user_id).first()
     
+    # Extract info from payload (Clerk session token usually has limited info)
+    # Note: For full profile info, we might need a separate webhook or frontend sync
+    # But let's try to get what we can or update if frontend sent a sync request
+    
+    # Simple Lazy Sync / Creation
     if not user:
-        # Create new user mapped to Clerk ID
-        # Extract additional info if available (though 'sub' is the only guaranteed claim in standard JWT)
-        # We might need to fetch user details from Clerk API if we want email/username here, 
-        # or rely on frontend to send it, but for Lazy Sync 'id' is enough to start.
-        
-        # NOTE: Clerk JWTs might not contain email/username by default unless customized. 
-        # For this implementation, we initialize with what we have.
-        
         user = models.User(
             id=clerk_user_id,
-            username=payload.get("username"), # Might be None
-            email=payload.get("email"), # Might be None
-            avatar_url=payload.get("image_url"), # Might be None
-            role=models.UserRole.PLAYER
+            username=payload.get("username"), 
+            email=payload.get("email"),
+            role=models.UserRole.PLAYER # Default role
         )
         db.add(user)
         db.commit()

@@ -29,15 +29,18 @@ class AssetType(str, enum.Enum):
 
 class User(Base):
     __tablename__ = "users"
-    id = Column(String, primary_key=True, index=True) # Changed from Integer to String for Clerk ID
-    username = Column(String, nullable=True) # Nullable, handled by Clerk
-    email = Column(String, unique=True, index=True, nullable=True) # Added email
-    avatar_url = Column(String, nullable=True) # Added avatar_url
+    id = Column(String, primary_key=True, index=True) # Clerk ID
+    username = Column(String, nullable=True)
+    email = Column(String, unique=True, index=True, nullable=True)
+    first_name = Column(String, nullable=True)
+    last_name = Column(String, nullable=True)
+    profile_image_url = Column(String, nullable=True)
+    avatar_url = Column(String, nullable=True) # Mantener por compatibilidad
     role = Column(Enum(UserRole), default=UserRole.PLAYER)
 
     campaigns = relationship("Campaign", back_populates="gm")
     characters = relationship("Character", back_populates="player")
-    universes = relationship("Universe", back_populates="gm") # Added relation
+    universes = relationship("Universe", back_populates="gm")
 
 class Universe(Base):
     __tablename__ = "universes"

@@ -10,8 +10,8 @@ export enum InventoryLocation {
 }
 
 export interface User {
-  id: number;
-  username: string;
+  id: string;
+  username?: string;
   role: UserRole;
 }
 
@@ -32,13 +32,16 @@ export interface InventoryItem {
 export interface Character {
   id: number;
   name: string;
-  stats: Record<string, number>;
+  stats: Record<string, any>;
   image_url?: string;
   inventory?: InventoryItem[];
 }
 
-export interface Campaign {
-  id: number;
-  name: string;
-  gm_id: number;
+export interface Universe {
+    id: number;
+    name: string;
+    description?: string;
+    cover_url?: string;
+    gm_id: string;
 }
+

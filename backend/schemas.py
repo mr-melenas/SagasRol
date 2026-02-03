@@ -21,8 +21,10 @@ class UserCreate(UserBase):
     role: UserRole = UserRole.PLAYER
 
 class User(UserBase):
-    id: int
+    id: str # Changed from int to str to match Clerk ID
     role: UserRole
+    email: Optional[str] = None
+    avatar_url: Optional[str] = None
     class Config:
         orm_mode = True
 
@@ -34,7 +36,7 @@ class CampaignCreate(CampaignBase):
 
 class Campaign(CampaignBase):
     id: int
-    gm_id: int
+    gm_id: str # Changed from int to str
     class Config:
         orm_mode = True
 
@@ -48,7 +50,7 @@ class CharacterCreate(CharacterBase):
 
 class Character(CharacterBase):
     id: int
-    user_id: int
+    user_id: str # Changed from int to str
     campaign_id: int
     class Config:
         orm_mode = True

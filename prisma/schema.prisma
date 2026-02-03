@@ -36,11 +36,14 @@ enum AssetType {
 
 // Models
 model User {
-  id          String   @id // Clerk ID
-  username    String?
-  email       String?  @unique
-  avatar_url  String?
-  role        UserRole @default(PLAYER)
+  id                String   @id // Clerk ID
+  username          String?
+  email             String?  @unique
+  first_name        String?
+  last_name         String?
+  profile_image_url String?
+  avatar_url        String? // Mantener por compatibilidad o eliminar si es redundante con profile_image_url
+  role              UserRole @default(PLAYER)
   
   // Relations
   gm_campaigns   Campaign[]  @relation("GMCampaigns")

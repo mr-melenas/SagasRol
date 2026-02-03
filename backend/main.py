@@ -49,8 +49,6 @@ app.include_router(universes.router, tags=["universes"])
 def read_root():
     return {"message": "Welcome to ROL-Sagas API"}
 
-# Auth Endpoints (Deprecated: Clerk handles auth now)
-# Kept for reference but endpoints protected by Clerk token verification
 @app.get("/users/me/", response_model=schemas.User)
 async def read_users_me(current_user: models.User = Depends(auth.get_current_user)):
     return current_user
