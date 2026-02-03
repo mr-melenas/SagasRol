@@ -43,7 +43,6 @@ model User {
   last_name         String?
   profile_image_url String?
   avatar_url        String? // Mantener por compatibilidad o eliminar si es redundante con profile_image_url
-  role              UserRole @default(PLAYER)
   
   // Relations
   gm_campaigns   Campaign[]  @relation("GMCampaigns")

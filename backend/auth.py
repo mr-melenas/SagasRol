@@ -83,8 +83,7 @@ def get_current_user(payload: dict = Depends(verify_clerk_token), db: Session = 
         user = models.User(
             id=clerk_user_id,
             username=payload.get("username"), 
-            email=payload.get("email"),
-            role=models.UserRole.PLAYER # Default role
+            email=payload.get("email")
         )
         db.add(user)
         db.commit()
@@ -93,6 +92,7 @@ def get_current_user(payload: dict = Depends(verify_clerk_token), db: Session = 
     return user
 
 async def get_current_active_gm(current_user: models.User = Depends(get_current_user)):
-    if current_user.role != models.UserRole.GM:
-        raise HTTPException(status_code=400, detail="Not enough privileges")
+    # Role logic removed for now, or implement new logic based on permissions
+    # if current_user.role != models.UserRole.GM:
+    #     raise HTTPException(status_code=400, detail="Not enough privileges")
     return current_user

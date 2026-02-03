@@ -24,11 +24,8 @@ def create_universe(universe: schemas.UniverseCreate, db: Session = Depends(data
 
 @router.get("/universes/", response_model=List[schemas.Universe])
 def read_universes(db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
-    # GMs see their own universes, Players see universes they are part of (via campaigns)
-    # For simplicity now, return universes created by the user if GM, or all public/joined if player logic is added
-    if current_user.role == models.UserRole.GM:
-        return db.query(models.Universe).filter(models.Universe.gm_id == current_user.id).all()
-    return [] # Placeholder for player logic
+    # Return universes created by the current user (where they are the GM/Creator)
+    return db.query(models.Universe).filter(models.Universe.gm_id == current_user.id).all()
 
 @router.get("/universes/{universe_id}", response_model=schemas.Universe)
 def read_universe(universe_id: int, db: Session = Depends(database.get_db)):

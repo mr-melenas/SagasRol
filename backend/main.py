@@ -58,8 +58,9 @@ async def read_users_me(current_user: models.User = Depends(auth.get_current_use
 # Campaign Endpoints
 @app.post("/campaigns/", response_model=schemas.Campaign)
 def create_campaign(campaign: schemas.CampaignCreate, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
-    if current_user.role != models.UserRole.GM:
-        raise HTTPException(status_code=403, detail="Only GMs can create campaigns")
+    # Role logic removed
+    # if current_user.role != models.UserRole.GM:
+    #    raise HTTPException(status_code=403, detail="Only GMs can create campaigns")
     db_campaign = models.Campaign(name=campaign.name, gm_id=current_user.id)
     db.add(db_campaign)
     db.commit()
@@ -116,7 +117,8 @@ def add_item_to_inventory(character_id: int, item_data: schemas.InventoryAdd, db
     character = db.query(models.Character).filter(models.Character.id == character_id).first()
     if not character:
         raise HTTPException(status_code=404, detail="Character not found")
-    if character.user_id != current_user.id and current_user.role != models.UserRole.GM:
+    # if character.user_id != current_user.id and current_user.role != models.UserRole.GM:
+    if character.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized")
 
     db_inventory = models.Inventory(
@@ -138,7 +140,8 @@ def move_inventory_item(inventory_id: int, update: schemas.InventoryUpdate, db: 
     
     # Check permission
     character = inventory_item.character
-    if character.user_id != current_user.id and current_user.role != models.UserRole.GM:
+    # if character.user_id != current_user.id and current_user.role != models.UserRole.GM:
+    if character.user_id != current_user.id:
          raise HTTPException(status_code=403, detail="Not authorized")
 
     inventory_item.location = update.location
@@ -153,8 +156,9 @@ def read_inventory(character_id: int, db: Session = Depends(database.get_db)):
 # Items (for testing)
 @app.post("/items/", response_model=schemas.Item)
 def create_item(item: schemas.ItemCreate, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
-    if current_user.role != models.UserRole.GM:
-        raise HTTPException(status_code=403, detail="Only GMs can create items")
+    # Role logic removed
+    # if current_user.role != models.UserRole.GM:
+    #    raise HTTPException(status_code=403, detail="Only GMs can create items")
     db_item = models.Item(**item.dict())
     db.add(db_item)
     db.commit()

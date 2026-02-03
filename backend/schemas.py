@@ -18,11 +18,11 @@ class UserBase(BaseModel):
 
 class UserCreate(UserBase):
     password: str
-    role: UserRole = UserRole.PLAYER
+    # role: UserRole = UserRole.PLAYER
 
 class User(UserBase):
     id: str # Changed from int to str to match Clerk ID
-    role: UserRole
+    # role: UserRole
     email: Optional[str] = None
     avatar_url: Optional[str] = None
     class Config:

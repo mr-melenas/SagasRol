@@ -36,7 +36,6 @@ class User(Base):
     last_name = Column(String, nullable=True)
     profile_image_url = Column(String, nullable=True)
     avatar_url = Column(String, nullable=True) # Mantener por compatibilidad
-    role = Column(Enum(UserRole), default=UserRole.PLAYER)
 
     campaigns = relationship("Campaign", back_populates="gm")
     characters = relationship("Character", back_populates="player")
