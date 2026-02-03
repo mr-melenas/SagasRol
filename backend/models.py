@@ -1,7 +1,7 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, JSON, Text, DateTime, Boolean, Enum
+from sqlalchemy import Column, Integer, String, ForeignKey, JSON, Text, DateTime, Boolean, Enum, ARRAY
 from sqlalchemy.orm import relationship
 try:
-    from .database import Base
+    from backend.database import Base
 except ImportError:
     from database import Base
 import enum
@@ -21,24 +21,65 @@ class DowntimeStatus(str, enum.Enum):
     APPROVED = "APPROVED"
     REJECTED = "REJECTED"
 
+class AssetType(str, enum.Enum):
+    SCENE = "SCENE"
+    NPC = "NPC"
+    ENEMY = "ENEMY"
+    ITEM = "ITEM"
+
 class User(Base):
     __tablename__ = "users"
-    id = Column(String, primary_key=True, index=True) # Changed from Integer to String for Clerk ID
-    username = Column(String, nullable=True) # Nullable, handled by Clerk
-    email = Column(String, unique=True, index=True, nullable=True) # Added email
-    avatar_url = Column(String, nullable=True) # Added avatar_url
-    role = Column(Enum(UserRole), default=UserRole.PLAYER)
+    id = Column(String, primary_key=True, index=True) # Clerk ID
+    username = Column(String, nullable=True)
+    email = Column(String, unique=True, index=True, nullable=True)
+    first_name = Column(String, nullable=True)
+    last_name = Column(String, nullable=True)
+    profile_image_url = Column(String, nullable=True)
+    avatar_url = Column(String, nullable=True) # Mantener por compatibilidad
 
     campaigns = relationship("Campaign", back_populates="gm")
     characters = relationship("Character", back_populates="player")
+    universes = relationship("Universe", back_populates="gm")
+
+class Universe(Base):
+    __tablename__ = "universes"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, index=True)
+    description = Column(Text, nullable=True)
+    cover_url = Column(String, nullable=True)
+    gm_id = Column(String, ForeignKey("users.id"))
+    
+    isPublic = Column(Boolean, default=True)
+    tags = Column(ARRAY(String), default=list) # Use ARRAY for PostgreSQL
+
+    # Configuration for character sheet and default dice
+    rules_config = Column(JSON, nullable=True)
+
+    # Relations
+    gm = relationship("User", back_populates="universes")
+    assets = relationship("Asset", back_populates="universe")
+    campaigns = relationship("Campaign", back_populates="universe")
+
+class Asset(Base):
+    __tablename__ = "assets"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, index=True)
+    image_url = Column(String)
+    type = Column(Enum(AssetType))
+    universe_id = Column(Integer, ForeignKey("universes.id"))
+
+    # Relations
+    universe = relationship("Universe", back_populates="assets")
 
 class Campaign(Base):
     __tablename__ = "campaigns"
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, index=True)
     gm_id = Column(String, ForeignKey("users.id")) # Changed to String
+    universe_id = Column(Integer, ForeignKey("universes.id"), nullable=True) # Added optional relation
 
     gm = relationship("User", back_populates="campaigns")
+    universe = relationship("Universe", back_populates="campaigns")
     characters = relationship("Character", back_populates="campaign")
     items = relationship("Item", back_populates="campaign")
     sessions = relationship("Session", back_populates="campaign")

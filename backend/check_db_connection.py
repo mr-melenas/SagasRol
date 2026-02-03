@@ -7,7 +7,7 @@ from urllib.parse import urlparse
 DB_URL = "postgresql://postgres:mZUv3-dNN*UkA4@db.ehwmlowgjuuhvdjqyzqs.supabase.co:5432/postgres"
 
 def check_connection():
-    print("--- Diagnóstico de Conexión a Supabase ---")
+    print("--- Diagnóstico de Conexión ---")
     
     try:
         parsed = urlparse(DB_URL)

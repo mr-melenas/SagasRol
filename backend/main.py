@@ -1,19 +1,32 @@
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from datetime import timedelta
 import socketio
 from typing import List
+import os
 
-try:
-    from . import models, database, schemas, auth
-except ImportError:
-    import models, database, schemas, auth
+import sys
+import os
+
+# Ensure root is in path
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
+
+from backend import models, database, schemas, auth
+from backend.routers import universes
 
 models.Base.metadata.create_all(bind=database.engine)
 
 app = FastAPI(title="ROL-Sagas")
+
+# Mount Static Files for Uploads
+os.makedirs("uploads/assets", exist_ok=True)
+app.mount("/static", StaticFiles(directory="uploads"), name="static")
 
 # CORS Configuration
 origins = [
@@ -34,12 +47,13 @@ app.add_middleware(
 sio = socketio.AsyncServer(async_mode='asgi', cors_allowed_origins='*')
 socket_app = socketio.ASGIApp(sio, app)
 
+# Include Routers
+app.include_router(universes.router, tags=["universes"])
+
 @app.get("/")
 def read_root():
     return {"message": "Welcome to ROL-Sagas API"}
 
-# Auth Endpoints (Deprecated: Clerk handles auth now)
-# Kept for reference but endpoints protected by Clerk token verification
 @app.get("/users/me/", response_model=schemas.User)
 async def read_users_me(current_user: models.User = Depends(auth.get_current_user)):
     return current_user
@@ -49,8 +63,9 @@ async def read_users_me(current_user: models.User = Depends(auth.get_current_use
 # Campaign Endpoints
 @app.post("/campaigns/", response_model=schemas.Campaign)
 def create_campaign(campaign: schemas.CampaignCreate, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
-    if current_user.role != models.UserRole.GM:
-        raise HTTPException(status_code=403, detail="Only GMs can create campaigns")
+    # Role logic removed
+    # if current_user.role != models.UserRole.GM:
+    #    raise HTTPException(status_code=403, detail="Only GMs can create campaigns")
     db_campaign = models.Campaign(name=campaign.name, gm_id=current_user.id)
     db.add(db_campaign)
     db.commit()
@@ -107,7 +122,8 @@ def add_item_to_inventory(character_id: int, item_data: schemas.InventoryAdd, db
     character = db.query(models.Character).filter(models.Character.id == character_id).first()
     if not character:
         raise HTTPException(status_code=404, detail="Character not found")
-    if character.user_id != current_user.id and current_user.role != models.UserRole.GM:
+    # if character.user_id != current_user.id and current_user.role != models.UserRole.GM:
+    if character.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized")
 
     db_inventory = models.Inventory(
@@ -129,7 +145,8 @@ def move_inventory_item(inventory_id: int, update: schemas.InventoryUpdate, db: 
     
     # Check permission
     character = inventory_item.character
-    if character.user_id != current_user.id and current_user.role != models.UserRole.GM:
+    # if character.user_id != current_user.id and current_user.role != models.UserRole.GM:
+    if character.user_id != current_user.id:
          raise HTTPException(status_code=403, detail="Not authorized")
 
     inventory_item.location = update.location
@@ -144,8 +161,9 @@ def read_inventory(character_id: int, db: Session = Depends(database.get_db)):
 # Items (for testing)
 @app.post("/items/", response_model=schemas.Item)
 def create_item(item: schemas.ItemCreate, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
-    if current_user.role != models.UserRole.GM:
-        raise HTTPException(status_code=403, detail="Only GMs can create items")
+    # Role logic removed
+    # if current_user.role != models.UserRole.GM:
+    #    raise HTTPException(status_code=403, detail="Only GMs can create items")
     db_item = models.Item(**item.dict())
     db.add(db_item)
     db.commit()

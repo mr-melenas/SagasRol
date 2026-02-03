@@ -1,7 +1,8 @@
 from pydantic import BaseModel
 from typing import List, Optional, Any, Dict
+import enum
 try:
-    from .models import UserRole, InventoryLocation, DowntimeStatus
+    from backend.models import UserRole, InventoryLocation, DowntimeStatus
 except ImportError:
     from models import UserRole, InventoryLocation, DowntimeStatus
 
@@ -13,15 +14,17 @@ class TokenData(BaseModel):
     username: Optional[str] = None
 
 class UserBase(BaseModel):
-    username: str
+    username: Optional[str] = None # Username is now optional
 
 class UserCreate(UserBase):
     password: str
-    role: UserRole = UserRole.PLAYER
+    # role: UserRole = UserRole.PLAYER
 
 class User(UserBase):
-    id: int
-    role: UserRole
+    id: str # Changed from int to str to match Clerk ID
+    # role: UserRole
+    email: Optional[str] = None
+    avatar_url: Optional[str] = None
     class Config:
         orm_mode = True
 
@@ -33,7 +36,7 @@ class CampaignCreate(CampaignBase):
 
 class Campaign(CampaignBase):
     id: int
-    gm_id: int
+    gm_id: str # Changed from int to str
     class Config:
         orm_mode = True
 
@@ -47,7 +50,7 @@ class CharacterCreate(CharacterBase):
 
 class Character(CharacterBase):
     id: int
-    user_id: int
+    user_id: str # Changed from int to str
     campaign_id: int
     class Config:
         orm_mode = True
@@ -81,3 +84,49 @@ class InventoryAdd(BaseModel):
     item_id: int
     quantity: int = 1
     location: InventoryLocation = InventoryLocation.BACKPACK
+
+# Universe Schemas
+class UniverseBase(BaseModel):
+    name: str
+    description: Optional[str] = None
+    cover_url: Optional[str] = None
+    rules_config: Optional[Dict[str, Any]] = None
+    isPublic: bool = True
+    tags: List[str] = []
+
+class UniverseCreate(UniverseBase):
+    pass
+
+class UniverseUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    cover_url: Optional[str] = None
+    rules_config: Optional[Dict[str, Any]] = None
+    isPublic: Optional[bool] = None
+    tags: Optional[List[str]] = None
+
+class Universe(UniverseBase):
+    id: int
+    gm_id: str
+    class Config:
+        orm_mode = True
+
+class AssetType(str, enum.Enum): # Should match database Enum
+    SCENE = "SCENE"
+    NPC = "NPC"
+    ENEMY = "ENEMY"
+    ITEM = "ITEM"
+
+class AssetBase(BaseModel):
+    name: str
+    image_url: str
+    type: AssetType
+
+class AssetCreate(AssetBase):
+    universe_id: int
+
+class Asset(AssetBase):
+    id: int
+    universe_id: int
+    class Config:
+        orm_mode = True
