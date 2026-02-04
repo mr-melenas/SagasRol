@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth, useUser } from '@clerk/clerk-react';
 import { Universe, Asset, AssetType } from '../types';
+import { SheetBuilder } from '../components/builder/SheetBuilder';
 
 export const UniverseSettings: React.FC = () => {
     const { id } = useParams<{ id: string }>();
@@ -247,11 +248,9 @@ export const UniverseSettings: React.FC = () => {
                 {activeTab === 'rules' && (
                     <div>
                         <h3 className="text-xl font-bold mb-4">Game System Rules</h3>
-                        <p className="text-gray-500 mb-4">Configuration for dice and character sheets coming soon...</p>
-                        {/* Placeholder for future implementation */}
-                        <div className="p-4 border border-dashed rounded text-center text-gray-400">
-                            Custom Sheet Editor Placeholder
-                        </div>
+                        <p className="text-gray-500 mb-6">Design the character sheet for your universe. Players will use this template to create their characters.</p>
+                        
+                        <SheetBuilder />
                     </div>
                 )}
 

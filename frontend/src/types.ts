@@ -63,3 +63,18 @@ export interface Asset {
     universe_id: number;
 }
 
+export type BlockType = 'STAT' | 'RESOURCE' | 'TEXT';
+
+export interface SheetBlock {
+  id: string;
+  type: BlockType;
+  label: string;
+  value?: string | number; // Default Value
+  config?: {
+    placeholder?: string;
+    color?: string; // For resource bars
+    min?: number;
+    max?: number;
+  };
+}
+
