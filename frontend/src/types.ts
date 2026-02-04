@@ -63,18 +63,21 @@ export interface Asset {
     universe_id: number;
 }
 
-export type BlockType = 'STAT' | 'RESOURCE' | 'TEXT';
+export type BlockType = 'STAT' | 'RESOURCE' | 'TEXT' | 'SKILL' | 'GROUP';
 
 export interface SheetBlock {
   id: string;
   type: BlockType;
   label: string;
   value?: string | number; // Default Value
+  children?: SheetBlock[]; // For GROUP
   config?: {
     placeholder?: string;
     color?: string; // For resource bars
     min?: number;
     max?: number;
+    direction?: 'row' | 'col'; // For GROUP layout
+    columns?: number; // For GROUP grid
   };
 }
 
