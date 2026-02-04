@@ -3,6 +3,7 @@ import { GameRoom } from './pages/GameRoom';
 import { CharacterSheet } from './pages/CharacterSheet';
 import { CreateUniverse } from './pages/CreateUniverse';
 import { UniverseSettings } from './pages/UniverseSettings';
+import { SheetManager } from './pages/SheetManager';
 import { 
   SignedIn, 
   SignedOut, 
@@ -245,6 +246,36 @@ function App() {
             <>
               <SignedOut><RedirectToSignIn /></SignedOut>
               <SignedIn><UniverseSettings /></SignedIn>
+            </>
+          } 
+        />
+        
+        <Route 
+          path="/sheets" 
+          element={
+            <>
+              <SignedOut><RedirectToSignIn /></SignedOut>
+              <SignedIn><SheetManager /></SignedIn>
+            </>
+          } 
+        />
+
+        <Route 
+          path="/sheets/new" 
+          element={
+            <>
+              <SignedOut><RedirectToSignIn /></SignedOut>
+              <SignedIn><SheetManager mode="create" /></SignedIn>
+            </>
+          } 
+        />
+
+        <Route 
+          path="/sheets/:id/edit" 
+          element={
+            <>
+              <SignedOut><RedirectToSignIn /></SignedOut>
+              <SignedIn><SheetManager mode="edit" /></SignedIn>
             </>
           } 
         />

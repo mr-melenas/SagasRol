@@ -37,6 +37,13 @@ export interface Character {
   inventory?: InventoryItem[];
 }
 
+export interface CharacterSheetTemplate {
+    id: string;
+    name: string;
+    structure: SheetBlock[];
+    ownerId: string;
+}
+
 export interface Universe {
     id: number;
     name: string;
@@ -46,6 +53,8 @@ export interface Universe {
     isPublic: boolean;
     tags: string[];
     rules_config?: Record<string, any>;
+    sheetTemplateId?: string;
+    sheetTemplate?: CharacterSheetTemplate;
 }
 
 export enum AssetType {

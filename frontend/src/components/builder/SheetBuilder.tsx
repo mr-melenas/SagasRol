@@ -1,23 +1,78 @@
 import React, { useState } from 'react';
 import { useSheetStore } from '../../stores/useSheetStore';
-import { DndContext, closestCenter, DragEndEvent } from '@dnd-kit/core';
+import { 
+    DndContext, 
+    closestCorners, 
+    DragEndEvent, 
+    DragOverlay, 
+    DragStartEvent,
+    useSensor,
+    useSensors,
+    PointerSensor
+} from '@dnd-kit/core';
 import { SortableContext, rectSortingStrategy } from '@dnd-kit/sortable';
 import { StatBlock, ResourceBlock, TextBlock, SkillBlock, GroupBlock } from './SheetBlocks';
 import { PlusSquare, LayoutTemplate, Type, Save, List, Layers } from 'lucide-react';
 import { SheetBlock } from '../../types';
 
 export const SheetBuilder: React.FC = () => {
-    const { blocks, addBlock, moveBlocks } = useSheetStore();
+    const { blocks, addBlock, moveBlocks, moveBlockToGroup } = useSheetStore();
     const [jsonPreview, setJsonPreview] = useState<string | null>(null);
+    const [activeBlock, setActiveBlock] = useState<SheetBlock | null>(null);
+
+    const sensors = useSensors(
+        useSensor(PointerSensor, {
+            activationConstraint: {
+                distance: 5,
+            },
+        })
+    );
+
+    const findBlockById = (blocks: SheetBlock[], id: string): SheetBlock | undefined => {
+        for (const block of blocks) {
+            if (block.id === id) return block;
+            if (block.children) {
+                const found = findBlockById(block.children, id);
+                if (found) return found;
+            }
+        }
+        return undefined;
+    };
+
+    const handleDragStart = (event: DragStartEvent) => {
+        const { active } = event;
+        const block = findBlockById(blocks, active.id as string);
+        if (block) {
+            setActiveBlock(block);
+        }
+    };
 
     const handleDragEnd = (event: DragEndEvent) => {
         const { active, over } = event;
-        if (over && active.id !== over.id) {
+        
+        setActiveBlock(null);
+
+        if (!over) return;
+
+        if (active.id === over.id) return;
+
+        // Check if dropping into empty group placeholder
+        const overIdString = String(over.id);
+        if (overIdString.endsWith('-placeholder')) {
+            const groupId = overIdString.replace('-placeholder', '');
+            // Prevent dropping a group into itself (if that were possible)
+            if (active.id !== groupId) {
+                moveBlockToGroup(active.id as string, groupId);
+            }
+            return;
+        }
+
+        if (active.id !== over.id) {
             moveBlocks(active.id as string, over.id as string);
         }
     };
 
-    const renderBlock = (block: SheetBlock) => {
+    const renderBlock = (block: SheetBlock, isOverlay: boolean = false) => {
         const isStat = block.type === 'STAT';
         const isGroup = block.type === 'GROUP';
         // Stats are small in main grid, groups full width, others adapt
@@ -25,11 +80,11 @@ export const SheetBuilder: React.FC = () => {
         
         return (
             <div key={block.id} className={className}>
-                {block.type === 'STAT' && <StatBlock block={block} />}
-                {block.type === 'RESOURCE' && <ResourceBlock block={block} />}
-                {block.type === 'TEXT' && <TextBlock block={block} />}
-                {block.type === 'SKILL' && <SkillBlock block={block} />}
-                {block.type === 'GROUP' && <GroupBlock block={block} />}
+                {block.type === 'STAT' && <StatBlock block={block} isOverlay={isOverlay} />}
+                {block.type === 'RESOURCE' && <ResourceBlock block={block} isOverlay={isOverlay} />}
+                {block.type === 'TEXT' && <TextBlock block={block} isOverlay={isOverlay} />}
+                {block.type === 'SKILL' && <SkillBlock block={block} isOverlay={isOverlay} />}
+                {block.type === 'GROUP' && <GroupBlock block={block} isOverlay={isOverlay} />}
             </div>
         );
     };
@@ -114,7 +169,12 @@ export const SheetBuilder: React.FC = () => {
 
             {/* Canvas */}
             <div className="flex-1 p-8 overflow-y-auto bg-gray-100/50">
-                <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                <DndContext 
+                    sensors={sensors}
+                    collisionDetection={closestCorners} 
+                    onDragStart={handleDragStart}
+                    onDragEnd={handleDragEnd}
+                >
                     <SortableContext items={blocks} strategy={rectSortingStrategy}>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-5xl mx-auto bg-white min-h-[600px] p-8 shadow-sm rounded-xl border border-dashed border-gray-300">
                             {blocks.length === 0 && (
@@ -125,9 +185,13 @@ export const SheetBuilder: React.FC = () => {
                                 </div>
                             )}
                             
-                            {blocks.map(renderBlock)}
+                            {blocks.map(block => renderBlock(block))}
                         </div>
                     </SortableContext>
+                    
+                    <DragOverlay>
+                        {activeBlock ? renderBlock(activeBlock, true) : null}
+                    </DragOverlay>
                 </DndContext>
             </div>
 

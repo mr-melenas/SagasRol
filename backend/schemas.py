@@ -93,6 +93,7 @@ class UniverseBase(BaseModel):
     rules_config: Optional[Dict[str, Any]] = None
     isPublic: bool = True
     tags: List[str] = []
+    sheetTemplateId: Optional[str] = None
 
 class UniverseCreate(UniverseBase):
     pass
@@ -104,10 +105,25 @@ class UniverseUpdate(BaseModel):
     rules_config: Optional[Dict[str, Any]] = None
     isPublic: Optional[bool] = None
     tags: Optional[List[str]] = None
+    sheetTemplateId: Optional[str] = None
+
+class CharacterSheetTemplateBase(BaseModel):
+    name: str
+    structure: List[Dict[str, Any]] # JSON structure
+    
+class CharacterSheetTemplateCreate(CharacterSheetTemplateBase):
+    pass
+
+class CharacterSheetTemplate(CharacterSheetTemplateBase):
+    id: str
+    ownerId: str
+    class Config:
+        orm_mode = True
 
 class Universe(UniverseBase):
     id: int
     gm_id: str
+    sheetTemplate: Optional[CharacterSheetTemplate] = None
     class Config:
         orm_mode = True
 

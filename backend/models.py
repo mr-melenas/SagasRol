@@ -55,10 +55,22 @@ class Universe(Base):
     # Configuration for character sheet and default dice
     rules_config = Column(JSON, nullable=True)
 
+    sheetTemplateId = Column(String, ForeignKey("character_sheet_templates.id"), nullable=True)
+
     # Relations
     gm = relationship("User", back_populates="universes")
     assets = relationship("Asset", back_populates="universe")
     campaigns = relationship("Campaign", back_populates="universe")
+    sheetTemplate = relationship("CharacterSheetTemplate", back_populates="universes")
+
+class CharacterSheetTemplate(Base):
+    __tablename__ = "character_sheet_templates"
+    id = Column(String, primary_key=True, index=True)
+    name = Column(String)
+    structure = Column(JSON) # The array of blocks
+    ownerId = Column(String)
+
+    universes = relationship("Universe", back_populates="sheetTemplate")
 
 class Asset(Base):
     __tablename__ = "assets"
