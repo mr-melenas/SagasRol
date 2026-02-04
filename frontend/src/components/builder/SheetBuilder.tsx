@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useSheetStore } from '../../stores/useSheetStore';
 import { 
     DndContext, 
-    closestCorners, 
+    pointerWithin,
     DragEndEvent, 
     DragOverlay, 
     DragStartEvent,
@@ -171,7 +171,7 @@ export const SheetBuilder: React.FC = () => {
             <div className="flex-1 p-8 overflow-y-auto bg-gray-100/50">
                 <DndContext 
                     sensors={sensors}
-                    collisionDetection={closestCorners} 
+                    collisionDetection={pointerWithin} 
                     onDragStart={handleDragStart}
                     onDragEnd={handleDragEnd}
                 >

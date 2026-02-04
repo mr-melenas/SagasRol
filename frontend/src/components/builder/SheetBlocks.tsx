@@ -159,7 +159,7 @@ export const GroupBlock: React.FC<{ block: SheetBlock, isOverlay?: boolean }> = 
                 <SortableContext items={childIds} strategy={rectSortingStrategy}>
                     <div 
                         ref={setDroppableRef} // Make the whole grid area droppable via the placeholder ID mechanism
-                        className="grid gap-2 min-h-[50px]"
+                        className="grid gap-2 min-h-[120px] p-4 content-start"
                         style={{ gridTemplateColumns: `repeat(${block.config?.columns || 1}, 1fr)` }}
                     >
                         {block.children && block.children.length > 0 ? (
@@ -175,9 +175,9 @@ export const GroupBlock: React.FC<{ block: SheetBlock, isOverlay?: boolean }> = 
                             ))
                         ) : (
                             <div 
-                                className="col-span-full py-4 text-center text-xs text-indigo-300 italic border border-indigo-100 rounded bg-white/50"
+                                className="col-span-full py-8 border-2 border-dashed border-indigo-200 rounded-lg flex items-center justify-center text-indigo-300 bg-white/50 pointer-events-none"
                             >
-                                Drop items here
+                                <span className="text-sm font-medium">Drop items here</span>
                             </div>
                         )}
                     </div>
