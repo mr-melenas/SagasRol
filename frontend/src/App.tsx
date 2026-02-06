@@ -182,7 +182,7 @@ function App() {
   return (
     <BrowserRouter>
       <header className="p-4 bg-slate-800 text-white flex justify-between items-center">
-        <div className="font-bold text-xl">ROL-Sagas</div>
+        <a href="/" className="font-bold text-xl hover:text-gray-300 transition-colors">ROL-Sagas</a>
         <div>
            <SignedOut>
              <SignInButton />

@@ -40,6 +40,10 @@ const BlockWrapper: React.FC<BlockWrapperProps> = ({ block, children, isOverlay 
     // If overlay, we override styles to look "lifted"
     const overlayStyle = isOverlay ? "shadow-xl ring-2 ring-blue-500 rotate-2 scale-105 z-50 bg-white opacity-100 cursor-grabbing" : "";
 
+    // Determine if we should show the generic header input
+    // Hide header input for these types as they have inline editing
+    const hideHeaderInput = ['CUSTOM_SKILL', 'INLINE_FIELD'].includes(block.type);
+
     return (
         <div 
             ref={isOverlay ? null : setNodeRef} 
@@ -56,13 +60,17 @@ const BlockWrapper: React.FC<BlockWrapperProps> = ({ block, children, isOverlay 
                     >
                         <GripVertical size={16} />
                     </button>
-                    <input 
-                        type="text" 
-                        value={block.label} 
-                        readOnly={isOverlay} // ReadOnly in overlay
-                        onChange={(e) => updateLabel(block.id, e.target.value)}
-                        className={`font-bold text-sm bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-500 focus:outline-none w-full ${isGroup ? 'text-indigo-700' : 'text-gray-700'}`}
-                    />
+                    {!hideHeaderInput && (
+                        <input 
+                            type="text" 
+                            value={block.label} 
+                            readOnly={isOverlay} // ReadOnly in overlay
+                            onChange={(e) => updateLabel(block.id, e.target.value)}
+                            data-no-dnd="true"
+                            onPointerDown={(e) => e.stopPropagation()}
+                            className={`font-bold text-sm bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-500 focus:outline-none w-full ${isGroup ? 'text-indigo-700' : 'text-gray-700'}`}
+                        />
+                    )}
                 </div>
                 {!isOverlay && (
                     <button onClick={() => removeBlock(block.id)} className="text-red-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -72,7 +80,7 @@ const BlockWrapper: React.FC<BlockWrapperProps> = ({ block, children, isOverlay 
             </div>
             
             {/* Content */}
-            <div className={`${isGroup ? '' : 'pointer-events-none opacity-80'}`}>
+            <div className="">
                 {children}
             </div>
         </div>
@@ -153,6 +161,7 @@ export const GroupBlock: React.FC<{ block: SheetBlock, isOverlay?: boolean }> = 
                         <option value="1">1 Col</option>
                         <option value="2">2 Cols</option>
                         <option value="3">3 Cols</option>
+                        <option value="4">4 Cols</option>
                     </select>
                 </div>
                 
@@ -169,7 +178,10 @@ export const GroupBlock: React.FC<{ block: SheetBlock, isOverlay?: boolean }> = 
                                     {child.type === 'STAT' && <StatBlock block={child} />}
                                     {child.type === 'RESOURCE' && <ResourceBlock block={child} />}
                                     {child.type === 'TEXT' && <TextBlock block={child} />}
+                                    {child.type === 'INLINE_FIELD' && <InlineFieldBlock block={child} />}
+                                    {child.type === 'SIMPLE_INPUT' && <SimpleInputBlock block={child} />}
                                     {child.type === 'SKILL' && <SkillBlock block={child} />}
+                                    {child.type === 'CUSTOM_SKILL' && <CustomSkillBlock block={child} />}
                                     {child.type === 'GROUP' && <GroupBlock block={child} />}
                                 </div>
                             ))
@@ -188,11 +200,109 @@ export const GroupBlock: React.FC<{ block: SheetBlock, isOverlay?: boolean }> = 
 };
 
 export const TextBlock: React.FC<{ block: SheetBlock, isOverlay?: boolean }> = ({ block, isOverlay }) => {
+    const { updateConfig } = useSheetStore();
+    
     return (
         <BlockWrapper block={block} isOverlay={isOverlay}>
-            <div className="h-16 w-full border border-gray-200 rounded bg-gray-50 p-2">
-                <div className="h-2 bg-gray-200 rounded w-3/4 mb-2"></div>
-                <div className="h-2 bg-gray-200 rounded w-1/2"></div>
+            <textarea 
+                className="w-full h-24 border border-gray-200 rounded bg-gray-50 p-2 text-sm text-gray-700 focus:outline-none focus:border-blue-500 resize-none"
+                placeholder="Write default text or instructions here..."
+                value={block.config?.defaultValue || ''}
+                readOnly={isOverlay}
+                data-no-dnd="true"
+                onChange={(e) => updateConfig(block.id, { defaultValue: e.target.value })}
+            />
+        </BlockWrapper>
+    );
+};
+
+export const InlineFieldBlock: React.FC<{ block: SheetBlock, isOverlay?: boolean }> = ({ block, isOverlay }) => {
+    const { updateLabel } = useSheetStore();
+
+    // Ensure we have a string value, fallback to "Label" if empty or undefined
+    const labelValue = block.label || "Label";
+
+    // Helper to ensure minimum content width for 4 chars
+    const displayLabel = labelValue.length < 4 
+        ? labelValue.padEnd(4, '\u00A0') // Pad with non-breaking spaces if too short
+        : labelValue;
+
+    return (
+        <BlockWrapper block={block} isOverlay={isOverlay}>
+            <div className="flex items-end gap-2 w-full">
+                {/* Auto-resizing input container */}
+                <div className="grid items-center max-w-[80%] relative">
+                    {/* Hidden span for width measurement - matches input style exactly */}
+                    <span 
+                        className="col-start-1 row-start-1 font-bold text-gray-700 mb-1 px-0 invisible whitespace-pre overflow-hidden pointer-events-none"
+                        aria-hidden="true"
+                    >
+                        {displayLabel}
+                    </span>
+                    
+                    {/* Actual Input */}
+                    <input 
+                        type="text"
+                        value={block.label}
+                        readOnly={isOverlay}
+                        onChange={(e) => updateLabel(block.id, e.target.value)}
+                        data-no-dnd="true"
+                        onPointerDown={(e) => e.stopPropagation()}
+                        className="col-start-1 row-start-1 w-full h-full font-bold text-gray-700 bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-500 focus:outline-none mb-1 px-0 placeholder-gray-400 min-w-[2rem]"
+                        placeholder="Label"
+                    />
+                </div>
+                
+                {/* Line fills remaining space */}
+                <div className="flex-1 border-b-2 border-gray-300 bg-gray-50 h-8"></div>
+            </div>
+        </BlockWrapper>
+    );
+};
+
+export const SimpleInputBlock: React.FC<{ block: SheetBlock, isOverlay?: boolean }> = ({ block, isOverlay }) => {
+    const { updateConfig } = useSheetStore();
+
+    return (
+        <BlockWrapper block={block} isOverlay={isOverlay}>
+             <input 
+                type="text" 
+                placeholder={block.config?.placeholder || "Placeholder..."}
+                value={block.config?.placeholder || ''}
+                readOnly={isOverlay}
+                data-no-dnd="true"
+                onChange={(e) => updateConfig(block.id, { placeholder: e.target.value })}
+                className="w-full p-2 border border-gray-300 rounded bg-gray-50 text-gray-500 italic"
+            />
+            <div className="text-[10px] text-gray-400 mt-1 text-right">Edit placeholder text above</div>
+        </BlockWrapper>
+    );
+};
+
+export const CustomSkillBlock: React.FC<{ block: SheetBlock, isOverlay?: boolean }> = ({ block, isOverlay }) => {
+    const { updateLabel } = useSheetStore();
+
+    return (
+        <BlockWrapper block={block} isOverlay={isOverlay}>
+            <div className="flex items-center gap-2">
+                {/* Number Field Placeholder */}
+                <div className="w-8 h-8 border border-gray-300 rounded flex items-center justify-center bg-gray-50 text-gray-400 font-bold text-sm shrink-0">
+                    0
+                </div>
+                
+                {/* Editable Text Field */}
+                <div className="flex-1 h-8 bg-white flex items-center border border-gray-300 rounded focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 transition-all">
+                    <input 
+                        type="text"
+                        value={block.label}
+                        readOnly={isOverlay}
+                        onChange={(e) => updateLabel(block.id, e.target.value)}
+                        data-no-dnd="true"
+                        onPointerDown={(e) => e.stopPropagation()}
+                        className="w-full h-full bg-transparent border-none focus:outline-none px-3 text-gray-700 font-medium text-sm placeholder-gray-400 rounded"
+                        placeholder="Skill Name..."
+                    />
+                </div>
             </div>
         </BlockWrapper>
     );

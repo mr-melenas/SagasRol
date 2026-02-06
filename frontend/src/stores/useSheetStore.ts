@@ -77,12 +77,16 @@ export const useSheetStore = create<SheetState>((set) => ({
         label: type === 'STAT' ? 'New Stat' : 
                type === 'RESOURCE' ? 'New Resource' : 
                type === 'SKILL' ? 'New Skill' :
-               type === 'GROUP' ? 'New Group' : 'New Text',
+               type === 'GROUP' ? 'New Group' : 
+               type === 'INLINE_FIELD' ? 'Label' :
+               type === 'SIMPLE_INPUT' ? 'Input' :
+               type === 'CUSTOM_SKILL' ? 'Skill Name' : 'New Text',
         children: type === 'GROUP' ? [] : undefined,
         config: {
             color: type === 'RESOURCE' ? '#ef4444' : undefined,
             direction: 'col',
-            columns: 1
+            columns: 1,
+            placeholder: type === 'SIMPLE_INPUT' ? 'Placeholder...' : undefined
         }
     };
 

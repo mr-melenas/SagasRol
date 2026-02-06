@@ -11,8 +11,8 @@ import {
     PointerSensor
 } from '@dnd-kit/core';
 import { SortableContext, rectSortingStrategy } from '@dnd-kit/sortable';
-import { StatBlock, ResourceBlock, TextBlock, SkillBlock, GroupBlock } from './SheetBlocks';
-import { PlusSquare, LayoutTemplate, Type, Save, List, Layers } from 'lucide-react';
+import { StatBlock, ResourceBlock, TextBlock, SkillBlock, GroupBlock, InlineFieldBlock, SimpleInputBlock, CustomSkillBlock } from './SheetBlocks';
+import { PlusSquare, LayoutTemplate, Type, Save, List, Layers, TextCursorInput, BoxSelect, FileEdit } from 'lucide-react';
 import { SheetBlock } from '../../types';
 
 export const SheetBuilder: React.FC = () => {
@@ -39,8 +39,21 @@ export const SheetBuilder: React.FC = () => {
         return undefined;
     };
 
+    // Prevent drag when interacting with inputs
     const handleDragStart = (event: DragStartEvent) => {
         const { active } = event;
+        
+        // Check if the event target (or any parent) has data-no-dnd attribute
+        // Note: dnd-kit's DragStartEvent doesn't give direct access to the original DOM event easily in this handler signature
+        // But the activationConstraint on PointerSensor usually handles this if we stop propagation on inputs?
+        // Actually, dnd-kit ignores drags started on elements that prevent default or stop propagation sometimes, 
+        // but the best way is to check the target in the sensor or use a modifier.
+        // HOWEVER, standard HTML inputs usually don't trigger drag if they are focused. 
+        // We added data-no-dnd to be safe, but we might need to use a custom activation criteria or just rely on default input behavior.
+        
+        // Let's rely on the fact that we are using a PointerSensor with distance constraint.
+        // Interacting with an input (clicking to focus) usually doesn't move 5px immediately.
+        
         const block = findBlockById(blocks, active.id as string);
         if (block) {
             setActiveBlock(block);
@@ -83,7 +96,10 @@ export const SheetBuilder: React.FC = () => {
                 {block.type === 'STAT' && <StatBlock block={block} isOverlay={isOverlay} />}
                 {block.type === 'RESOURCE' && <ResourceBlock block={block} isOverlay={isOverlay} />}
                 {block.type === 'TEXT' && <TextBlock block={block} isOverlay={isOverlay} />}
+                {block.type === 'INLINE_FIELD' && <InlineFieldBlock block={block} isOverlay={isOverlay} />}
+                {block.type === 'SIMPLE_INPUT' && <SimpleInputBlock block={block} isOverlay={isOverlay} />}
                 {block.type === 'SKILL' && <SkillBlock block={block} isOverlay={isOverlay} />}
+                {block.type === 'CUSTOM_SKILL' && <CustomSkillBlock block={block} isOverlay={isOverlay} />}
                 {block.type === 'GROUP' && <GroupBlock block={block} isOverlay={isOverlay} />}
             </div>
         );
@@ -129,6 +145,29 @@ export const SheetBuilder: React.FC = () => {
                             <div className="text-xs text-gray-500">Descriptions</div>
                         </div>
                     </button>
+
+                    <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mt-2">Text Fields</div>
+                    <button 
+                        onClick={() => addBlock('INLINE_FIELD')}
+                        className="w-full flex items-center gap-3 p-3 border rounded hover:bg-purple-50 hover:border-purple-300 transition-colors text-left"
+                    >
+                        <TextCursorInput size={20} className="text-purple-500" />
+                        <div>
+                            <div className="font-bold text-sm">Inline Field</div>
+                            <div className="text-xs text-gray-500">Label + Input</div>
+                        </div>
+                    </button>
+
+                    <button 
+                        onClick={() => addBlock('SIMPLE_INPUT')}
+                        className="w-full flex items-center gap-3 p-3 border rounded hover:bg-orange-50 hover:border-orange-300 transition-colors text-left"
+                    >
+                        <BoxSelect size={20} className="text-orange-500" />
+                        <div>
+                            <div className="font-bold text-sm">Simple Input</div>
+                            <div className="text-xs text-gray-500">Just a box</div>
+                        </div>
+                    </button>
                 </div>
 
                 <div className="space-y-3 mt-4">
@@ -140,7 +179,18 @@ export const SheetBuilder: React.FC = () => {
                         <List size={20} className="text-green-500" />
                         <div>
                             <div className="font-bold text-sm">Skill Item</div>
-                            <div className="text-xs text-gray-500">Compact row</div>
+                            <div className="text-xs text-gray-500">Static Label</div>
+                        </div>
+                    </button>
+
+                    <button 
+                        onClick={() => addBlock('CUSTOM_SKILL')}
+                        className="w-full flex items-center gap-3 p-3 border rounded hover:bg-teal-50 hover:border-teal-300 transition-colors text-left"
+                    >
+                        <FileEdit size={20} className="text-teal-500" />
+                        <div>
+                            <div className="font-bold text-sm">Custom Skill</div>
+                            <div className="text-xs text-gray-500">Editable Name</div>
                         </div>
                     </button>
 

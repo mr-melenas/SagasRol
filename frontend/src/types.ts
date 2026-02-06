@@ -72,7 +72,7 @@ export interface Asset {
     universe_id: number;
 }
 
-export type BlockType = 'STAT' | 'RESOURCE' | 'TEXT' | 'SKILL' | 'GROUP';
+export type BlockType = 'STAT' | 'RESOURCE' | 'TEXT' | 'SKILL' | 'GROUP' | 'INLINE_FIELD' | 'SIMPLE_INPUT' | 'CUSTOM_SKILL';
 
 export interface SheetBlock {
   id: string;
@@ -87,6 +87,7 @@ export interface SheetBlock {
     max?: number;
     direction?: 'row' | 'col'; // For GROUP layout
     columns?: number; // For GROUP grid
+    defaultValue?: string; // For TEXT_AREA
   };
 }
 

@@ -167,8 +167,11 @@ export const SheetManager: React.FC<SheetManagerProps> = ({ mode = 'list' }) => 
             {/* Header */}
             <header className="bg-white border-b px-8 py-4 flex items-center justify-between shadow-sm z-10">
                 <div className="flex items-center gap-4">
-                    <button onClick={() => navigate('/sheets')} className="text-gray-500 hover:text-gray-800">
-                        &larr; Back
+                    <button 
+                        onClick={() => navigate('/sheets')} 
+                        className="text-gray-500 hover:text-gray-800 flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition-colors text-sm font-medium"
+                    >
+                        &larr; Back to List
                     </button>
                     <div className="h-6 w-px bg-gray-300"></div>
                     <input 
