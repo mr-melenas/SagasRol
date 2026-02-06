@@ -2,7 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth, useUser } from '@clerk/clerk-react';
-import { Universe, Asset, AssetType } from '../types';
+import { Universe, Asset, AssetType, CharacterSheetTemplate } from '../types';
+import { SheetBuilder } from '../components/builder/SheetBuilder';
+import { FileText, ExternalLink, RefreshCw } from 'lucide-react';
 
 export const UniverseSettings: React.FC = () => {
     const { id } = useParams<{ id: string }>();
@@ -15,6 +17,10 @@ export const UniverseSettings: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'general' | 'rules' | 'assets'>('general');
     
+    // Template States
+    const [templates, setTemplates] = useState<CharacterSheetTemplate[]>([]);
+    const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
+
     // Form States
     const [formData, setFormData] = useState({
         name: '',
@@ -31,11 +37,14 @@ export const UniverseSettings: React.FC = () => {
             if (!id) return;
             try {
                 const token = await getToken();
-                const [uniRes, assetRes] = await Promise.all([
+                const [uniRes, assetRes, templatesRes] = await Promise.all([
                     axios.get(`http://localhost:8000/universes/${id}`, {
                         headers: { Authorization: `Bearer ${token}` }
                     }),
                     axios.get(`http://localhost:8000/universes/${id}/assets`, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    }),
+                    axios.get('http://localhost:8000/sheets/', {
                         headers: { Authorization: `Bearer ${token}` }
                     })
                 ]);
@@ -43,6 +52,11 @@ export const UniverseSettings: React.FC = () => {
                 const uniData = uniRes.data;
                 setUniverse(uniData);
                 setAssets(assetRes.data);
+                setTemplates(templatesRes.data);
+                
+                if (uniData.sheetTemplateId) {
+                    setSelectedTemplateId(uniData.sheetTemplateId);
+                }
                 
                 // Init Form
                 setFormData({
@@ -91,6 +105,38 @@ export const UniverseSettings: React.FC = () => {
     const removeTag = (tagToRemove: string) => {
         setFormData(prev => ({ ...prev, tags: prev.tags.filter(t => t !== tagToRemove) }));
         setIsDirty(true);
+    };
+
+    const handleTemplateChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const newTemplateId = e.target.value;
+        setSelectedTemplateId(newTemplateId);
+        
+        if (!id) return;
+
+        // Auto-save selection
+        try {
+            const token = await getToken();
+            await axios.patch(`http://localhost:8000/universes/${id}`, {
+                sheetTemplateId: newTemplateId || null
+            }, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+        } catch (err) {
+            console.error("Error updating universe template", err);
+            alert("Failed to update template selection");
+        }
+    };
+
+    const loadTemplates = async () => {
+        try {
+            const token = await getToken();
+            const res = await axios.get('http://localhost:8000/sheets/', {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setTemplates(res.data);
+        } catch (err) {
+            console.error("Error loading templates", err);
+        }
     };
 
     const handleSave = async () => {
@@ -247,11 +293,62 @@ export const UniverseSettings: React.FC = () => {
                 {activeTab === 'rules' && (
                     <div>
                         <h3 className="text-xl font-bold mb-4">Game System Rules</h3>
-                        <p className="text-gray-500 mb-4">Configuration for dice and character sheets coming soon...</p>
-                        {/* Placeholder for future implementation */}
-                        <div className="p-4 border border-dashed rounded text-center text-gray-400">
-                            Custom Sheet Editor Placeholder
+                        <p className="text-gray-500 mb-6">Select the Character Sheet Template for this universe.</p>
+                        
+                        <div className="bg-gray-50 p-6 rounded-xl border border-gray-200 mb-8">
+                            <label className="block font-bold text-gray-700 mb-2">Active Character Sheet</label>
+                            <div className="flex gap-4">
+                                <div className="flex-1 relative">
+                                    <select 
+                                        className="w-full appearance-none bg-white border border-gray-300 rounded-lg py-3 px-4 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        value={selectedTemplateId}
+                                        onChange={handleTemplateChange}
+                                    >
+                                        <option value="">-- Select a Template --</option>
+                                        {templates.map(t => (
+                                            <option key={t.id} value={t.id}>{t.name}</option>
+                                        ))}
+                                    </select>
+                                    <div className="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none text-gray-500">
+                                        <FileText size={18} />
+                                    </div>
+                                </div>
+                                <button 
+                                    onClick={loadTemplates}
+                                    className="p-3 bg-white border border-gray-300 rounded-lg text-gray-500 hover:text-blue-600 hover:border-blue-300 transition-colors"
+                                    title="Refresh Templates"
+                                >
+                                    <RefreshCw size={20} />
+                                </button>
+                            </div>
+                            
+                            <div className="mt-4 flex items-center justify-between text-sm">
+                                <p className="text-gray-500">
+                                    {selectedTemplateId 
+                                        ? "Players will use this template when creating characters." 
+                                        : "No template selected. Players won't be able to create characters."}
+                                </p>
+                                <a 
+                                    href="/sheets" 
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="flex items-center gap-1 text-blue-600 font-medium hover:underline"
+                                >
+                                    Manage Templates <ExternalLink size={14} />
+                                </a>
+                            </div>
                         </div>
+
+                        {selectedTemplateId && (
+                            <div className="border rounded-lg overflow-hidden opacity-75 pointer-events-none bg-gray-50">
+                                <div className="bg-gray-100 px-4 py-2 border-b text-xs font-bold text-gray-500 uppercase tracking-wider">
+                                    Preview (Read Only)
+                                </div>
+                                <div className="p-4 transform scale-90 origin-top">
+                                    <SheetBuilder /> 
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
 

@@ -18,7 +18,7 @@ if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
 
 from backend import models, database, schemas, auth
-from backend.routers import universes
+from backend.routers import universes, sheets
 
 models.Base.metadata.create_all(bind=database.engine)
 
@@ -49,6 +49,7 @@ socket_app = socketio.ASGIApp(sio, app)
 
 # Include Routers
 app.include_router(universes.router, tags=["universes"])
+app.include_router(sheets.router, tags=["sheets"])
 
 @app.get("/")
 def read_root():

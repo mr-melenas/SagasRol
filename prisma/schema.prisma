@@ -65,12 +65,26 @@ model Universe {
   // Example: { "default_dice": "d20", "attributes": ["Strength", "Agility"] }
   rules_config Json?
 
+  sheetTemplateId String?
+  sheetTemplate   CharacterSheetTemplate? @relation(fields: [sheetTemplateId], references: [id])
+
   // Relations
   gm          User     @relation("GMUniverses", fields: [gm_id], references: [id])
   assets      Asset[]
   campaigns   Campaign[]
 
   @@map("universes")
+}
+
+model CharacterSheetTemplate {
+  id        String   @id @default(uuid())
+  name      String   // Ej: "D&D 5e Estándar"
+  structure Json     // El array de bloques que crea tu builder
+  ownerId   String
+  
+  universes Universe[]
+
+  @@map("character_sheet_templates")
 }
 
 model Asset {
