@@ -4,8 +4,9 @@ import axios from 'axios';
 import { useAuth } from '@clerk/clerk-react';
 import { SheetBuilder } from '../components/builder/SheetBuilder';
 import { CharacterSheetTemplate } from '../types';
-import { Plus, Edit, FileText } from 'lucide-react';
+import { Plus, Edit, FileText, Eye } from 'lucide-react';
 import { useSheetStore } from '../stores/useSheetStore';
+import { CharacterSheetView } from '../components/player/CharacterSheetView';
 
 interface SheetManagerProps {
     mode?: 'list' | 'create' | 'edit';
@@ -20,6 +21,7 @@ export const SheetManager: React.FC<SheetManagerProps> = ({ mode = 'list' }) => 
     const [templates, setTemplates] = useState<CharacterSheetTemplate[]>([]);
     const [loading, setLoading] = useState(false);
     const [sheetName, setSheetName] = useState('New Character Sheet');
+    const [previewMode, setPreviewMode] = useState(false);
 
     useEffect(() => {
         if (mode === 'list') {
@@ -184,6 +186,17 @@ export const SheetManager: React.FC<SheetManagerProps> = ({ mode = 'list' }) => 
                 </div>
                 <div className="flex items-center gap-3">
                     <button 
+                        onClick={() => setPreviewMode(!previewMode)}
+                        className={`px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition-colors border ${
+                            previewMode 
+                            ? 'bg-indigo-100 text-indigo-700 border-indigo-200' 
+                            : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                        }`}
+                    >
+                        <Eye size={18} />
+                        {previewMode ? 'Exit Preview' : 'Player Preview'}
+                    </button>
+                    <button 
                         onClick={handleSave}
                         disabled={loading}
                         className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-blue-700 disabled:opacity-50 transition-colors shadow-sm"
@@ -194,8 +207,20 @@ export const SheetManager: React.FC<SheetManagerProps> = ({ mode = 'list' }) => 
             </header>
 
             {/* Builder Area */}
-            <div className="flex-1 overflow-hidden p-6">
-                <SheetBuilder />
+            <div className={`flex-1 overflow-hidden ${previewMode ? 'overflow-y-auto bg-gray-100' : 'p-6'}`}>
+                {previewMode ? (
+                    <div className="max-w-4xl mx-auto py-8">
+                        <div className="bg-white rounded-lg shadow-lg overflow-hidden border border-gray-200">
+                             <div className="bg-gray-50 border-b px-6 py-2 flex justify-between items-center">
+                                <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Player View Preview</span>
+                                <span className="text-xs text-gray-400 italic">This is how players will see the sheet</span>
+                            </div>
+                            <CharacterSheetView templateData={blocks} />
+                        </div>
+                    </div>
+                ) : (
+                    <SheetBuilder />
+                )}
             </div>
         </div>
     );

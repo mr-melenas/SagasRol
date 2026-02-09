@@ -136,6 +136,8 @@ const ResourceBlockBase: React.FC<BlockProps> = ({ block, isOverlay, mode = 'BUI
     const current = mode === 'PLAYER' ? safeValue.current : (block.config?.defaultCurrent ?? 10);
     const max = mode === 'PLAYER' ? safeValue.max : (block.config?.defaultMax ?? 20);
 
+    const barColor = block.config?.color || '#ef4444'; 
+
     const handleValueChange = (field: 'current' | 'max', val: string) => {
         const numVal = parseInt(val) || 0;
         if (mode === 'PLAYER') {
@@ -159,7 +161,7 @@ const ResourceBlockBase: React.FC<BlockProps> = ({ block, isOverlay, mode = 'BUI
                                 <input 
                                     type="color" 
                                     className="opacity-0 w-0 h-0 absolute" 
-                                    value={block.config?.color || '#ef4444'}
+                                    value={barColor}
                                     onChange={(e) => updateConfig(block.id, { color: e.target.value })}
                                 />
                             </label>
@@ -169,16 +171,18 @@ const ResourceBlockBase: React.FC<BlockProps> = ({ block, isOverlay, mode = 'BUI
                         <input 
                             type="number"
                             value={current}
+                            disabled={mode === 'BUILDER'}
                             onChange={(e) => handleValueChange('current', e.target.value)}
-                            className="w-12 text-right border-b border-gray-300 focus:border-blue-500 focus:outline-none bg-transparent font-mono text-sm"
+                            className={`w-12 text-right border-b font-mono text-sm bg-transparent focus:outline-none ${mode === 'BUILDER' ? 'border-gray-200 text-gray-400 cursor-not-allowed' : 'border-gray-300 focus:border-blue-500 text-gray-900'}`}
                             placeholder="Cur"
                         />
                         <span className="text-gray-400 text-xs">/</span>
                         <input 
                             type="number"
                             value={max}
+                            disabled={mode === 'BUILDER'}
                             onChange={(e) => handleValueChange('max', e.target.value)}
-                            className="w-12 text-left border-b border-gray-300 focus:border-blue-500 focus:outline-none bg-transparent font-mono text-sm"
+                            className={`w-12 text-left border-b font-mono text-sm bg-transparent focus:outline-none ${mode === 'BUILDER' ? 'border-gray-200 text-gray-400 cursor-not-allowed' : 'border-gray-300 focus:border-blue-500 text-gray-900'}`}
                             placeholder="Max"
                         />
                      </div>
@@ -189,7 +193,7 @@ const ResourceBlockBase: React.FC<BlockProps> = ({ block, isOverlay, mode = 'BUI
                         className="h-full transition-all duration-500 ease-out" 
                         style={{ 
                             width: `${percentage}%`,
-                            backgroundColor: block.config?.color || '#ef4444' 
+                            backgroundColor: barColor 
                         }}
                     ></div>
                 </div>
