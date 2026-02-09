@@ -86,6 +86,10 @@ def create_character(character: schemas.CharacterCreate, db: Session = Depends(d
     db.refresh(db_character)
     return db_character
 
+@app.get("/my-characters/", response_model=List[schemas.Character])
+def read_my_characters(db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
+    return db.query(models.Character).filter(models.Character.user_id == current_user.id).all()
+
 def recalculate_stats(character: models.Character, db: Session):
     base_stats = character.stats.copy() if character.stats else {}
     equipped_items = db.query(models.Inventory).filter(
@@ -116,6 +120,26 @@ def read_character(character_id: int, db: Session = Depends(database.get_db)):
     # To properly return this via Pydantic, we might need a separate schema or just override the dict
     character.stats = effective_stats 
     return character
+
+@app.put("/characters/{character_id}", response_model=schemas.Character)
+def update_character(character_id: int, character_update: schemas.CharacterUpdate, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
+    db_character = db.query(models.Character).filter(models.Character.id == character_id).first()
+    if not db_character:
+        raise HTTPException(status_code=404, detail="Character not found")
+    
+    if db_character.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    if character_update.name is not None:
+        db_character.name = character_update.name
+    if character_update.stats is not None:
+        db_character.stats = character_update.stats
+    if character_update.image_url is not None:
+        db_character.image_url = character_update.image_url
+
+    db.commit()
+    db.refresh(db_character)
+    return db_character
 
 # Inventory Endpoints
 @app.post("/characters/{character_id}/inventory/", response_model=schemas.InventoryItem)

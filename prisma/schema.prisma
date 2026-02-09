@@ -72,6 +72,7 @@ model Universe {
   gm          User     @relation("GMUniverses", fields: [gm_id], references: [id])
   assets      Asset[]
   campaigns   Campaign[]
+  characters  Character[]
 
   @@map("universes")
 }
@@ -120,13 +121,15 @@ model Character {
   id          Int      @id @default(autoincrement())
   name        String
   user_id     String
-  campaign_id Int
+  campaign_id Int?
+  universe_id Int?
   stats       Json?    // e.g., {"strength": 10, "magic": 5}
   image_url   String?
 
   // Relations
   player           User             @relation("PlayerCharacters", fields: [user_id], references: [id])
-  campaign         Campaign         @relation(fields: [campaign_id], references: [id])
+  campaign         Campaign?        @relation(fields: [campaign_id], references: [id])
+  universe         Universe?        @relation(fields: [universe_id], references: [id])
   inventory        Inventory[]
   downtime_actions DowntimeAction[]
 

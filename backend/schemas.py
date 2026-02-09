@@ -46,12 +46,19 @@ class CharacterBase(BaseModel):
     image_url: Optional[str] = None
 
 class CharacterCreate(CharacterBase):
-    campaign_id: int
+    campaign_id: Optional[int] = None
+    universe_id: int
+
+class CharacterUpdate(BaseModel):
+    name: Optional[str] = None
+    stats: Optional[Dict[str, Any]] = None
+    image_url: Optional[str] = None
 
 class Character(CharacterBase):
     id: int
     user_id: str # Changed from int to str
-    campaign_id: int
+    campaign_id: Optional[int] = None
+    universe_id: Optional[int] = None
     class Config:
         orm_mode = True
 

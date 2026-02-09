@@ -61,6 +61,7 @@ class Universe(Base):
     gm = relationship("User", back_populates="universes")
     assets = relationship("Asset", back_populates="universe")
     campaigns = relationship("Campaign", back_populates="universe")
+    characters = relationship("Character", back_populates="universe")
     sheetTemplate = relationship("CharacterSheetTemplate", back_populates="universes")
 
 class CharacterSheetTemplate(Base):
@@ -101,12 +102,14 @@ class Character(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, index=True)
     user_id = Column(String, ForeignKey("users.id")) # Changed to String
-    campaign_id = Column(Integer, ForeignKey("campaigns.id"))
+    campaign_id = Column(Integer, ForeignKey("campaigns.id"), nullable=True)
+    universe_id = Column(Integer, ForeignKey("universes.id"), nullable=True)
     stats = Column(JSON) # e.g., {"strength": 10, "magic": 5}
     image_url = Column(String, nullable=True)
     
     player = relationship("User", back_populates="characters")
     campaign = relationship("Campaign", back_populates="characters")
+    universe = relationship("Universe", back_populates="characters")
     inventory = relationship("Inventory", back_populates="character")
     downtime_actions = relationship("DowntimeAction", back_populates="character")
 

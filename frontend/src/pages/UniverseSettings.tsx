@@ -15,7 +15,7 @@ export const UniverseSettings: React.FC = () => {
     const [universe, setUniverse] = useState<Universe | null>(null);
     const [assets, setAssets] = useState<Asset[]>([]);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<'general' | 'rules' | 'assets'>('general');
+    const [activeTab, setActiveTab] = useState<'general' | 'rules' | 'assets' | 'advanced'>('general');
     
     // Template States
     const [templates, setTemplates] = useState<CharacterSheetTemplate[]>([]);
@@ -193,6 +193,29 @@ export const UniverseSettings: React.FC = () => {
         }
     };
 
+    const handleDeleteUniverse = async () => {
+        if (!id || !universe) return;
+        
+        const confirmName = window.prompt(`To confirm deletion, please type "${universe.name}" below:`);
+        
+        if (confirmName !== universe.name) {
+            if (confirmName !== null) alert("Universe name does not match. Deletion cancelled.");
+            return;
+        }
+
+        try {
+            const token = await getToken();
+            await axios.delete(`http://localhost:8000/universes/${id}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            alert("Universe deleted successfully.");
+            navigate('/dashboard');
+        } catch (err) {
+            console.error("Failed to delete universe", err);
+            alert("Failed to delete universe. Please try again.");
+        }
+    };
+
     if (loading) return <div className="p-8 text-center">Loading settings...</div>;
     if (!universe) return <div className="p-8 text-center">Universe not found</div>;
 
@@ -215,7 +238,7 @@ export const UniverseSettings: React.FC = () => {
 
             {/* Tabs */}
             <div className="flex border-b mb-6">
-                {(['general', 'rules', 'assets'] as const).map(tab => (
+                {(['general', 'rules', 'assets', 'advanced'] as const).map(tab => (
                     <button
                         key={tab}
                         onClick={() => setActiveTab(tab)}
@@ -384,6 +407,31 @@ export const UniverseSettings: React.FC = () => {
                                 </div>
                             </div>
                         ))}
+                    </div>
+                )}
+
+                {/* ADVANCED TAB */}
+                {activeTab === 'advanced' && (
+                    <div className="space-y-8">
+                        <div>
+                            <h3 className="text-xl font-bold text-gray-800 mb-2">Advanced Settings</h3>
+                            <p className="text-gray-500 mb-6">Danger zone and advanced configurations.</p>
+                        </div>
+
+                        <div className="border border-red-200 rounded-lg p-6 bg-red-50">
+                            <h4 className="text-lg font-bold text-red-700 mb-2">Danger Zone</h4>
+                            <p className="text-red-600 mb-4 text-sm">
+                                Deleting this universe will permanently remove it and all associated data (assets, campaigns, etc.).
+                                This action cannot be undone.
+                            </p>
+                            
+                            <button 
+                                onClick={handleDeleteUniverse}
+                                className="bg-red-600 text-white px-4 py-2 rounded font-bold hover:bg-red-700 transition-colors shadow-sm"
+                            >
+                                Delete Universe
+                            </button>
+                        </div>
                     </div>
                 )}
             </div>

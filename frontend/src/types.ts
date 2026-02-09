@@ -35,6 +35,8 @@ export interface Character {
   stats: Record<string, any>;
   image_url?: string;
   inventory?: InventoryItem[];
+  universe_id?: number;
+  campaign_id?: number;
 }
 
 export interface CharacterSheetTemplate {
