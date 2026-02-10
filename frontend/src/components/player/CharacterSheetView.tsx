@@ -1,7 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import { SheetBlock, SheetTab, SheetTemplateData } from '../../types';
 import { useCharacterStore } from '../../store/useCharacterStore';
-import { StatBlock, ResourceBlock, TextBlock, InlineFieldBlock, SimpleInputBlock, SkillBlock, CustomSkillBlock, GroupBlock, AvatarBlock } from '../builder/SheetBlocks';
+import { StatBlock, ResourceBlock, TextBlock, InlineFieldBlock, SimpleInputBlock, SkillBlock, CustomSkillBlock, GroupBlock, AvatarBlock, PlayerNoteBlock } from '../builder/SheetBlocks';
 
 interface CharacterSheetViewProps {
     templateData: SheetBlock[] | SheetTemplateData;
@@ -81,6 +81,7 @@ export const CharacterSheetView: React.FC<CharacterSheetViewProps> = ({ template
                         {block.type === 'SIMPLE_INPUT' && <SimpleInputBlock block={block} mode="PLAYER" value={getValue(block.id)} onValueChange={(v) => onBlockChange(block.id, v)} />}
                         {block.type === 'SKILL' && <SkillBlock block={block} mode="PLAYER" value={getValue(block.id)} onValueChange={(v) => onBlockChange(block.id, v)} />}
                         {block.type === 'CUSTOM_SKILL' && <CustomSkillBlock block={block} mode="PLAYER" value={getValue(block.id)} onValueChange={(v) => onBlockChange(block.id, v)} />}
+                        {block.type === 'PLAYER_NOTE' && <PlayerNoteBlock block={block} mode="PLAYER" value={getValue(block.id)} onValueChange={(v) => onBlockChange(block.id, v)} />}
                         {block.type === 'CHARACTER_IMAGE' && <AvatarBlock block={block} mode="PLAYER" value={getValue(block.id)} onValueChange={(v) => onBlockChange(block.id, v)} />}
                         {block.type === 'GROUP' && <GroupBlock block={block} mode="PLAYER" getValue={getValue} onBlockChange={onBlockChange} />}
                     </div>

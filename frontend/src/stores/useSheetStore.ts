@@ -129,13 +129,14 @@ export const useSheetStore = create<SheetState>((set) => ({
                type === 'INLINE_FIELD' ? 'Label' :
                type === 'SIMPLE_INPUT' ? 'Input' :
                type === 'CUSTOM_SKILL' ? 'Skill Name' : 
-               type === 'CHARACTER_IMAGE' ? 'Character Portrait' : 'New Text',
+               type === 'CHARACTER_IMAGE' ? 'Character Portrait' : 
+               type === 'PLAYER_NOTE' ? 'Label' : 'New Text',
         children: type === 'GROUP' ? [] : undefined,
         config: {
             color: type === 'RESOURCE' ? '#ef4444' : undefined,
             direction: 'col',
             columns: 1,
-            placeholder: type === 'SIMPLE_INPUT' ? 'Placeholder...' : undefined,
+            placeholder: type === 'SIMPLE_INPUT' || type === 'PLAYER_NOTE' ? 'Placeholder...' : undefined,
             avatarShape: type === 'CHARACTER_IMAGE' ? 'square' : undefined
         }
     };

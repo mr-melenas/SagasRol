@@ -412,19 +412,24 @@ const GroupBlockBase: React.FC<BlockProps> = ({ block, isOverlay, mode = 'BUILDE
         return null; 
     }
 
+    const columns = block.config?.columns || 1;
+    const gridColsClass = 
+        columns === 1 ? 'grid-cols-1' :
+        columns === 2 ? 'grid-cols-1 sm:grid-cols-2' :
+        columns === 3 ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' :
+        'grid-cols-1 md:grid-cols-2 lg:grid-cols-4';
+
     const content = (
         <div 
             ref={mode === 'PLAYER' ? null : setDroppableRef}
-            className={`grid gap-2 ${mode === 'PLAYER' ? 'p-1' : 'min-h-[120px] p-4'} content-start`}
-            style={{ 
-                gridTemplateColumns: mode === 'PLAYER' 
-                    ? `repeat(auto-fit, minmax(250px, 1fr))` // Responsive grid in Player Mode
-                    : `repeat(${block.config?.columns || 1}, 1fr)` // Fixed grid in Builder Mode
+            className={`grid ${mode === 'PLAYER' ? 'gap-2 p-2' : 'gap-2 min-h-[120px] p-4'} content-start w-full ${mode === 'PLAYER' ? gridColsClass : ''}`}
+            style={mode === 'PLAYER' ? {} : { 
+                gridTemplateColumns: `repeat(${columns}, 1fr)` 
             }}
         >
             {block.children && block.children.length > 0 ? (
                 block.children.map(child => (
-                    <div key={child.id} className="relative">
+                    <div key={child.id} className="relative w-full min-w-0">
                         {child.type === 'STAT' && <StatBlock block={child} mode={mode} value={getValue?.(child.id)} onValueChange={(v) => onBlockChange?.(child.id, v)} onContextMenu={onContextMenu} />}
                         {child.type === 'RESOURCE' && <ResourceBlock block={child} mode={mode} value={getValue?.(child.id)} onValueChange={(v) => onBlockChange?.(child.id, v)} onContextMenu={onContextMenu} />}
                         {child.type === 'TEXT' && <TextBlock block={child} mode={mode} onContextMenu={onContextMenu} />}
@@ -432,6 +437,7 @@ const GroupBlockBase: React.FC<BlockProps> = ({ block, isOverlay, mode = 'BUILDE
                         {child.type === 'SIMPLE_INPUT' && <SimpleInputBlock block={child} mode={mode} value={getValue?.(child.id)} onValueChange={(v) => onBlockChange?.(child.id, v)} onContextMenu={onContextMenu} />}
                         {child.type === 'SKILL' && <SkillBlock block={child} mode={mode} value={getValue?.(child.id)} onValueChange={(v) => onBlockChange?.(child.id, v)} onContextMenu={onContextMenu} />}
                         {child.type === 'CUSTOM_SKILL' && <CustomSkillBlock block={child} mode={mode} value={getValue?.(child.id)} onValueChange={(v) => onBlockChange?.(child.id, v)} onContextMenu={onContextMenu} />}
+                        {child.type === 'PLAYER_NOTE' && <PlayerNoteBlock block={child} mode={mode} value={getValue?.(child.id)} onValueChange={(v) => onBlockChange?.(child.id, v)} onContextMenu={onContextMenu} />}
                         {child.type === 'GROUP' && <GroupBlock block={child} mode={mode} getValue={getValue} onBlockChange={onBlockChange} onContextMenu={onContextMenu} />}
                     </div>
                 ))
@@ -557,3 +563,69 @@ const AvatarBlockBase: React.FC<BlockProps> = ({ block, isOverlay, mode = 'BUILD
     );
 };
 export const AvatarBlock = React.memo(AvatarBlockBase);
+
+const PlayerNoteBlockBase: React.FC<BlockProps> = ({ block, isOverlay, mode = 'BUILDER', value, onValueChange, onContextMenu }) => {
+    const { updateLabel, updateConfig } = useSheetStore();
+
+    return (
+        <BlockWrapper block={block} isOverlay={isOverlay} mode={mode} onContextMenu={onContextMenu}>
+            <div className="flex items-center gap-2">
+                {/* Fixed "0" box style placeholder (visual only, not editable here) or maybe editable? 
+                    User asked for "like this item" -> Custom Skill has a number box. 
+                    If it's purely a note, maybe no number box? 
+                    "create an item like this, but the difference is that the player will be able to write in it."
+                    The reference image is a Custom Skill (Number + Text).
+                    So we want a Number + Text input where BOTH are editable by player?
+                    Or just the text is editable by player (which Custom Skill already does)?
+                    
+                    Wait, Custom Skill:
+                    - Builder: Edit Label (Skill Name).
+                    - Player: Edit Value (Number). Label is static.
+
+                    User wants: "Player will be able to write in it".
+                    Likely means Player can write the LABEL (Text) too.
+                    Like an "Inventory Item" or "Custom Note".
+                */}
+                
+                {mode === 'PLAYER' ? (
+                     <input 
+                        type="number"
+                        value={value?.value ?? ''}
+                        onChange={(e) => onValueChange && onValueChange({ ...value, value: e.target.value })}
+                        className="w-8 h-8 border border-gray-300 rounded text-center font-bold text-sm shrink-0 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                        placeholder="0"
+                    />
+                ) : (
+                    <div className="w-8 h-8 border border-gray-300 rounded flex items-center justify-center bg-gray-50 text-gray-400 font-bold text-sm shrink-0">
+                        #
+                    </div>
+                )}
+                
+                {/* Name Input - Editable by Player too! */}
+                <div className="flex-1 h-8 bg-white flex items-center border border-gray-300 rounded focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 transition-all">
+                    {mode === 'PLAYER' ? (
+                        <input 
+                            type="text"
+                            value={value?.text ?? ''}
+                            onChange={(e) => onValueChange && onValueChange({ ...value, text: e.target.value })}
+                            className="w-full h-full bg-transparent border-none focus:outline-none px-3 text-gray-700 font-medium text-sm placeholder-gray-400 rounded"
+                            placeholder={block.label || "Item Name..."}
+                        />
+                    ) : (
+                        <input 
+                            type="text"
+                            value={block.label}
+                            readOnly={isOverlay}
+                            onChange={(e) => updateLabel(block.id, e.target.value)}
+                            data-no-dnd="true"
+                            onPointerDown={(e) => e.stopPropagation()}
+                            className="w-full h-full bg-transparent border-none focus:outline-none px-3 text-gray-700 font-medium text-sm placeholder-gray-400 rounded"
+                            placeholder="Default Label..."
+                        />
+                    )}
+                </div>
+            </div>
+        </BlockWrapper>
+    );
+};
+export const PlayerNoteBlock = React.memo(PlayerNoteBlockBase);

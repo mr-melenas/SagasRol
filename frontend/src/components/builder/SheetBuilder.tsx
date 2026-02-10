@@ -11,8 +11,8 @@ import {
     PointerSensor
 } from '@dnd-kit/core';
 import { SortableContext, rectSortingStrategy } from '@dnd-kit/sortable';
-import { StatBlock, ResourceBlock, TextBlock, SkillBlock, GroupBlock, InlineFieldBlock, SimpleInputBlock, CustomSkillBlock, AvatarBlock } from './SheetBlocks';
-import { PlusSquare, LayoutTemplate, Type, Save, List, Layers, TextCursorInput, BoxSelect, FileEdit, Image as ImageIcon } from 'lucide-react';
+import { StatBlock, ResourceBlock, TextBlock, SkillBlock, GroupBlock, InlineFieldBlock, SimpleInputBlock, CustomSkillBlock, AvatarBlock, PlayerNoteBlock } from './SheetBlocks';
+import { PlusSquare, LayoutTemplate, Type, Save, List, Layers, TextCursorInput, BoxSelect, FileEdit, Image as ImageIcon, PenTool } from 'lucide-react';
 import { SheetBlock } from '../../types';
 
 import { SheetTabs } from './SheetTabs';
@@ -129,6 +129,7 @@ export const SheetBuilder: React.FC = () => {
                 {block.type === 'SIMPLE_INPUT' && <SimpleInputBlock block={block} isOverlay={isOverlay} onContextMenu={handleContextMenu} />}
                 {block.type === 'SKILL' && <SkillBlock block={block} isOverlay={isOverlay} onContextMenu={handleContextMenu} />}
                 {block.type === 'CUSTOM_SKILL' && <CustomSkillBlock block={block} isOverlay={isOverlay} onContextMenu={handleContextMenu} />}
+                {block.type === 'PLAYER_NOTE' && <PlayerNoteBlock block={block} isOverlay={isOverlay} onContextMenu={handleContextMenu} />}
                 {block.type === 'CHARACTER_IMAGE' && <AvatarBlock block={block} isOverlay={isOverlay} onContextMenu={handleContextMenu} />}
                 {block.type === 'GROUP' && <GroupBlock block={block} isOverlay={isOverlay} onContextMenu={handleContextMenu} />}
             </div>
@@ -247,6 +248,17 @@ export const SheetBuilder: React.FC = () => {
                         <div>
                             <div className="font-bold text-sm">Custom Skill</div>
                             <div className="text-xs text-gray-500">Editable Name</div>
+                        </div>
+                    </button>
+
+                    <button 
+                        onClick={() => addBlock('PLAYER_NOTE')}
+                        className="w-full flex items-center gap-3 p-3 border rounded hover:bg-purple-50 hover:border-purple-300 transition-colors text-left"
+                    >
+                        <PenTool size={20} className="text-purple-500" />
+                        <div>
+                            <div className="font-bold text-sm">Inventory / Note Item</div>
+                            <div className="text-xs text-gray-500">Value + Editable Label</div>
                         </div>
                     </button>
 

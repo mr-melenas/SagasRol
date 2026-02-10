@@ -84,7 +84,7 @@ export interface SheetTab {
   name: string;
 }
 
-export type BlockType = 'STAT' | 'RESOURCE' | 'TEXT' | 'SKILL' | 'GROUP' | 'INLINE_FIELD' | 'SIMPLE_INPUT' | 'CUSTOM_SKILL' | 'CHARACTER_IMAGE';
+export type BlockType = 'STAT' | 'RESOURCE' | 'TEXT' | 'SKILL' | 'GROUP' | 'INLINE_FIELD' | 'SIMPLE_INPUT' | 'CUSTOM_SKILL' | 'CHARACTER_IMAGE' | 'PLAYER_NOTE';
 
 export interface SheetBlock {
   id: string;
