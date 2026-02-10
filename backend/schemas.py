@@ -116,7 +116,7 @@ class UniverseUpdate(BaseModel):
 
 class CharacterSheetTemplateBase(BaseModel):
     name: str
-    structure: List[Dict[str, Any]] # JSON structure
+    structure: Any # JSON structure, can be List[Dict] (old) or Dict (new with tabs)
     
 class CharacterSheetTemplateCreate(CharacterSheetTemplateBase):
     pass

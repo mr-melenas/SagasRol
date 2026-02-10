@@ -11,14 +11,28 @@ import {
     PointerSensor
 } from '@dnd-kit/core';
 import { SortableContext, rectSortingStrategy } from '@dnd-kit/sortable';
-import { StatBlock, ResourceBlock, TextBlock, SkillBlock, GroupBlock, InlineFieldBlock, SimpleInputBlock, CustomSkillBlock } from './SheetBlocks';
-import { PlusSquare, LayoutTemplate, Type, Save, List, Layers, TextCursorInput, BoxSelect, FileEdit } from 'lucide-react';
+import { StatBlock, ResourceBlock, TextBlock, SkillBlock, GroupBlock, InlineFieldBlock, SimpleInputBlock, CustomSkillBlock, AvatarBlock } from './SheetBlocks';
+import { PlusSquare, LayoutTemplate, Type, Save, List, Layers, TextCursorInput, BoxSelect, FileEdit, Image as ImageIcon } from 'lucide-react';
 import { SheetBlock } from '../../types';
 
+import { SheetTabs } from './SheetTabs';
+import { BlockContextMenu } from './BlockContextMenu';
+
 export const SheetBuilder: React.FC = () => {
-    const { blocks, addBlock, moveBlocks, moveBlockToGroup } = useSheetStore();
+    const { blocks, addBlock, moveBlocks, moveBlockToGroup, activeTabId } = useSheetStore();
     const [jsonPreview, setJsonPreview] = useState<string | null>(null);
     const [activeBlock, setActiveBlock] = useState<SheetBlock | null>(null);
+    
+    // Context Menu State
+    const [contextMenu, setContextMenu] = useState<{
+        visible: boolean;
+        x: number;
+        y: number;
+        block: SheetBlock | null;
+    }>({ visible: false, x: 0, y: 0, block: null });
+
+    // Filter blocks for current tab
+    const currentBlocks = blocks.filter(b => b.tabId === activeTabId);
 
     const sensors = useSensors(
         useSensor(PointerSensor, {
@@ -85,6 +99,16 @@ export const SheetBuilder: React.FC = () => {
         }
     };
 
+    const handleContextMenu = (e: React.MouseEvent, block: SheetBlock) => {
+        e.preventDefault();
+        setContextMenu({
+            visible: true,
+            x: e.clientX,
+            y: e.clientY,
+            block
+        });
+    };
+
     const renderBlock = (block: SheetBlock, isOverlay: boolean = false) => {
         const isStat = block.type === 'STAT';
         const isGroup = block.type === 'GROUP';
@@ -92,7 +116,11 @@ export const SheetBuilder: React.FC = () => {
         const className = isStat ? 'col-span-1' : 'col-span-2 md:col-span-4';
         
         return (
-            <div key={block.id} className={className}>
+            <div 
+                key={block.id} 
+                className={className}
+                onContextMenu={(e) => !isOverlay && handleContextMenu(e, block)}
+            >
                 {block.type === 'STAT' && <StatBlock block={block} isOverlay={isOverlay} />}
                 {block.type === 'RESOURCE' && <ResourceBlock block={block} isOverlay={isOverlay} />}
                 {block.type === 'TEXT' && <TextBlock block={block} isOverlay={isOverlay} />}
@@ -100,6 +128,7 @@ export const SheetBuilder: React.FC = () => {
                 {block.type === 'SIMPLE_INPUT' && <SimpleInputBlock block={block} isOverlay={isOverlay} />}
                 {block.type === 'SKILL' && <SkillBlock block={block} isOverlay={isOverlay} />}
                 {block.type === 'CUSTOM_SKILL' && <CustomSkillBlock block={block} isOverlay={isOverlay} />}
+                {block.type === 'CHARACTER_IMAGE' && <AvatarBlock block={block} isOverlay={isOverlay} />}
                 {block.type === 'GROUP' && <GroupBlock block={block} isOverlay={isOverlay} />}
             </div>
         );
@@ -107,12 +136,38 @@ export const SheetBuilder: React.FC = () => {
 
     return (
         <div className="flex h-[700px] border rounded-lg overflow-hidden bg-gray-50">
+            {/* Context Menu */}
+            {contextMenu.visible && contextMenu.block && (
+                <BlockContextMenu 
+                    block={contextMenu.block}
+                    position={{ x: contextMenu.x, y: contextMenu.y }}
+                    onClose={() => setContextMenu({ ...contextMenu, visible: false })}
+                    onRename={() => {
+                        // TODO: Focus logic could be tricky here without passing a ref, 
+                        // but user can just click normally to edit now. 
+                        // Maybe focus the input?
+                        // For now we just close, user can click to rename as usual.
+                    }}
+                />
+            )}
+
             {/* Toolbar */}
             <div className="w-64 bg-white border-r p-4 flex flex-col gap-3 overflow-y-auto">
                 <h3 className="font-bold text-gray-700 mb-2">Toolbox</h3>
                 
                 <div className="space-y-3">
                     <div className="text-xs font-bold text-gray-400 uppercase tracking-wider">Basic</div>
+                    <button 
+                        onClick={() => addBlock('CHARACTER_IMAGE')}
+                        className="w-full flex items-center gap-3 p-3 border rounded hover:bg-pink-50 hover:border-pink-300 transition-colors text-left"
+                    >
+                        <ImageIcon size={20} className="text-pink-500" />
+                        <div>
+                            <div className="font-bold text-sm">Character Avatar</div>
+                            <div className="text-xs text-gray-500">Image Upload</div>
+                        </div>
+                    </button>
+
                     <button 
                         onClick={() => addBlock('STAT')}
                         className="w-full flex items-center gap-3 p-3 border rounded hover:bg-blue-50 hover:border-blue-300 transition-colors text-left"
@@ -218,31 +273,35 @@ export const SheetBuilder: React.FC = () => {
             </div>
 
             {/* Canvas */}
-            <div className="flex-1 p-8 overflow-y-auto bg-gray-100/50">
-                <DndContext 
-                    sensors={sensors}
-                    collisionDetection={pointerWithin} 
-                    onDragStart={handleDragStart}
-                    onDragEnd={handleDragEnd}
-                >
-                    <SortableContext items={blocks} strategy={rectSortingStrategy}>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-5xl mx-auto bg-white min-h-[600px] p-8 shadow-sm rounded-xl border border-dashed border-gray-300">
-                            {blocks.length === 0 && (
-                                <div className="col-span-full flex flex-col items-center justify-center text-gray-400 py-32">
-                                    <LayoutTemplate size={48} className="mb-4 opacity-20" />
-                                    <p className="text-lg font-medium">Your character sheet is empty</p>
-                                    <p className="text-sm opacity-70">Add blocks from the toolbox to start designing</p>
-                                </div>
-                            )}
-                            
-                            {blocks.map(block => renderBlock(block))}
-                        </div>
-                    </SortableContext>
-                    
-                    <DragOverlay>
-                        {activeBlock ? renderBlock(activeBlock, true) : null}
-                    </DragOverlay>
-                </DndContext>
+            <div className="flex-1 flex flex-col overflow-hidden bg-gray-100/50">
+                <SheetTabs />
+                
+                <div className="flex-1 p-8 overflow-y-auto">
+                    <DndContext 
+                        sensors={sensors}
+                        collisionDetection={pointerWithin} 
+                        onDragStart={handleDragStart}
+                        onDragEnd={handleDragEnd}
+                    >
+                        <SortableContext items={currentBlocks} strategy={rectSortingStrategy}>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-5xl mx-auto bg-white min-h-[600px] p-8 shadow-sm rounded-b-xl border border-dashed border-gray-300">
+                                {currentBlocks.length === 0 && (
+                                    <div className="col-span-full flex flex-col items-center justify-center text-gray-400 py-32">
+                                        <LayoutTemplate size={48} className="mb-4 opacity-20" />
+                                        <p className="text-lg font-medium">This tab is empty</p>
+                                        <p className="text-sm opacity-70">Add blocks from the toolbox</p>
+                                    </div>
+                                )}
+                                
+                                {currentBlocks.map(block => renderBlock(block))}
+                            </div>
+                        </SortableContext>
+                        
+                        <DragOverlay>
+                            {activeBlock ? renderBlock(activeBlock, true) : null}
+                        </DragOverlay>
+                    </DndContext>
+                </div>
             </div>
 
             {/* Debug Modal */}

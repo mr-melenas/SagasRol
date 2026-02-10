@@ -16,7 +16,7 @@ export const SheetManager: React.FC<SheetManagerProps> = ({ mode = 'list' }) => 
     const navigate = useNavigate();
     const { id } = useParams();
     const { getToken } = useAuth();
-    const { setBlocks, blocks } = useSheetStore();
+    const { setBlocks, blocks, tabs } = useSheetStore();
     
     const [templates, setTemplates] = useState<CharacterSheetTemplate[]>([]);
     const [loading, setLoading] = useState(false);
@@ -57,7 +57,22 @@ export const SheetManager: React.FC<SheetManagerProps> = ({ mode = 'list' }) => 
                 headers: { Authorization: `Bearer ${token}` }
             });
             setSheetName(res.data.name);
-            setBlocks(res.data.structure);
+
+            // Handle new structure (with tabs) vs old structure (array of blocks)
+            const structure = res.data.structure;
+            if (Array.isArray(structure)) {
+                // Legacy format
+                setBlocks(structure);
+            } else if (structure && structure.blocks && structure.tabs) {
+                // New format
+                setBlocks(structure.blocks);
+                useSheetStore.getState().setTabs(structure.tabs);
+                
+                // Set active tab to first one
+                if (structure.tabs.length > 0) {
+                    useSheetStore.getState().setActiveTab(structure.tabs[0].id);
+                }
+            }
         } catch (err) {
             console.error("Error loading template", err);
             alert("Failed to load template");
@@ -78,7 +93,10 @@ export const SheetManager: React.FC<SheetManagerProps> = ({ mode = 'list' }) => 
             const token = await getToken();
             const payload = {
                 name: sheetName,
-                structure: blocks
+                structure: {
+                    tabs: tabs,
+                    blocks: blocks
+                }
             };
 
             if (mode === 'create') {
@@ -215,7 +233,7 @@ export const SheetManager: React.FC<SheetManagerProps> = ({ mode = 'list' }) => 
                                 <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Player View Preview</span>
                                 <span className="text-xs text-gray-400 italic">This is how players will see the sheet</span>
                             </div>
-                            <CharacterSheetView templateData={blocks} />
+                            <CharacterSheetView templateData={{ tabs, blocks }} />
                         </div>
                     </div>
                 ) : (

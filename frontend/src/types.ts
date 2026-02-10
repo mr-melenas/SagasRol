@@ -42,8 +42,13 @@ export interface Character {
 export interface CharacterSheetTemplate {
     id: string;
     name: string;
-    structure: SheetBlock[];
+    structure: SheetBlock[] | SheetTemplateData; // Support new structure
     ownerId: string;
+}
+
+export interface SheetTemplateData {
+    tabs: SheetTab[];
+    blocks: SheetBlock[];
 }
 
 export interface Universe {
@@ -74,12 +79,18 @@ export interface Asset {
     universe_id: number;
 }
 
-export type BlockType = 'STAT' | 'RESOURCE' | 'TEXT' | 'SKILL' | 'GROUP' | 'INLINE_FIELD' | 'SIMPLE_INPUT' | 'CUSTOM_SKILL';
+export interface SheetTab {
+  id: string;
+  name: string;
+}
+
+export type BlockType = 'STAT' | 'RESOURCE' | 'TEXT' | 'SKILL' | 'GROUP' | 'INLINE_FIELD' | 'SIMPLE_INPUT' | 'CUSTOM_SKILL' | 'CHARACTER_IMAGE';
 
 export interface SheetBlock {
   id: string;
   type: BlockType;
   label: string;
+  tabId?: string; // New property for pagination
   value?: string | number; // Default Value
   children?: SheetBlock[]; // For GROUP
   config?: {
@@ -90,6 +101,7 @@ export interface SheetBlock {
     direction?: 'row' | 'col'; // For GROUP layout
     columns?: number; // For GROUP grid
     defaultValue?: string; // For TEXT_AREA
+    avatarShape?: 'square' | 'circle'; // For CHARACTER_IMAGE
   };
 }
 

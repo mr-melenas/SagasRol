@@ -4,7 +4,7 @@ import { useSheetStore } from '../../stores/useSheetStore';
 import { useSortable, SortableContext, rectSortingStrategy } from '@dnd-kit/sortable';
 import { useDroppable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
-import { Trash2, GripVertical, Palette } from 'lucide-react';
+import { Trash2, GripVertical, Palette, Image as ImageIcon, Upload } from 'lucide-react';
 
 export type SheetMode = 'BUILDER' | 'PLAYER';
 
@@ -472,3 +472,80 @@ const GroupBlockBase: React.FC<BlockProps> = ({ block, isOverlay, mode = 'BUILDE
     );
 };
 export const GroupBlock = React.memo(GroupBlockBase);
+
+const AvatarBlockBase: React.FC<BlockProps> = ({ block, isOverlay, mode = 'BUILDER', value, onValueChange }) => {
+    const { updateConfig } = useSheetStore();
+
+    const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file && onValueChange) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                onValueChange(reader.result as string);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const isCircle = block.config?.avatarShape === 'circle';
+
+    return (
+        <BlockWrapper block={block} isOverlay={isOverlay} mode={mode}>
+            <div className="flex flex-col items-center justify-center">
+                {mode === 'BUILDER' && (
+                    <div className="flex gap-2 mb-2">
+                        <button 
+                            onClick={() => updateConfig(block.id, { avatarShape: 'square' })}
+                            className={`p-1 rounded border ${!isCircle ? 'bg-blue-50 border-blue-500' : 'bg-white border-gray-200'}`}
+                            title="Square"
+                        >
+                            <div className="w-4 h-4 bg-gray-400 rounded-sm"></div>
+                        </button>
+                        <button 
+                            onClick={() => updateConfig(block.id, { avatarShape: 'circle' })}
+                            className={`p-1 rounded border ${isCircle ? 'bg-blue-50 border-blue-500' : 'bg-white border-gray-200'}`}
+                            title="Circle"
+                        >
+                            <div className="w-4 h-4 bg-gray-400 rounded-full"></div>
+                        </button>
+                    </div>
+                )}
+
+                <div className={`
+                    relative bg-gray-100 border-2 border-dashed border-gray-300 overflow-hidden flex items-center justify-center
+                    ${isCircle ? 'rounded-full' : 'rounded-lg'}
+                    aspect-square w-full max-w-[200px]
+                `}>
+                    {value ? (
+                        <img src={value} alt="Character Avatar" className="w-full h-full object-cover" />
+                    ) : (
+                        <div className="text-gray-400 flex flex-col items-center text-center p-4">
+                            {mode === 'PLAYER' ? (
+                                <>
+                                    <Upload size={32} className="mb-2" />
+                                    <span className="text-xs">Click to upload</span>
+                                </>
+                            ) : (
+                                <>
+                                    <ImageIcon size={32} className="mb-2" />
+                                    <span className="text-xs">Avatar Placeholder</span>
+                                </>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Input for Player Mode */}
+                    {mode === 'PLAYER' && (
+                        <input 
+                            type="file" 
+                            accept="image/*" 
+                            onChange={handleFileUpload}
+                            className="absolute inset-0 opacity-0 cursor-pointer"
+                        />
+                    )}
+                </div>
+            </div>
+        </BlockWrapper>
+    );
+};
+export const AvatarBlock = React.memo(AvatarBlockBase);
