@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { useSheetStore } from '../../stores/useSheetStore';
 import { SheetBlock } from '../../types';
-import { Trash2, Edit, ArrowRight } from 'lucide-react';
+import { Trash2, Edit, ArrowRight, Copy, Layers } from 'lucide-react';
 
 interface BlockContextMenuProps {
     block: SheetBlock;
@@ -12,7 +12,7 @@ interface BlockContextMenuProps {
 
 export const BlockContextMenu: React.FC<BlockContextMenuProps> = ({ block, position, onClose, onRename }) => {
     const menuRef = useRef<HTMLDivElement>(null);
-    const { removeBlock, moveBlockToTab, tabs, activeTabId } = useSheetStore();
+    const { removeBlock, moveBlockToTab, duplicateBlock, tabs, activeTabId } = useSheetStore();
 
     // Close on click outside
     useEffect(() => {
@@ -42,6 +42,19 @@ export const BlockContextMenu: React.FC<BlockContextMenuProps> = ({ block, posit
     // Handle Move
     const handleMove = (targetTabId: string) => {
         moveBlockToTab(block.id, targetTabId);
+        onClose();
+    };
+
+    // Handle Duplicate
+    const handleDuplicate = () => {
+        duplicateBlock(block.id);
+        onClose();
+    };
+
+    // Handle Copy To
+    const handleCopyTo = (targetTabId: string) => {
+        duplicateBlock(block.id, targetTabId);
+        alert(`Copied to tab!`); // Simple feedback for now
         onClose();
     };
 
@@ -80,6 +93,42 @@ export const BlockContextMenu: React.FC<BlockContextMenuProps> = ({ block, posit
                             <button
                                 key={tab.id}
                                 onClick={() => handleMove(tab.id)}
+                                className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                            >
+                                {tab.name}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            <div className="border-t my-1"></div>
+
+            {/* Duplicate */}
+            <button 
+                onClick={handleDuplicate}
+                className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+            >
+                <Copy size={14} />
+                Duplicate
+            </button>
+
+             {/* Copy To Submenu */}
+             {otherTabs.length > 0 && (
+                <div className="relative group/submenu-copy">
+                    <button className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center justify-between">
+                        <span className="flex items-center gap-2">
+                            <Layers size={14} />
+                            Copy to...
+                        </span>
+                    </button>
+                    
+                    {/* Submenu Content */}
+                    <div className="absolute left-full top-0 ml-1 bg-white rounded-lg shadow-xl border border-gray-200 py-1 min-w-[150px] hidden group-hover/submenu-copy:block">
+                        {otherTabs.map(tab => (
+                            <button
+                                key={tab.id}
+                                onClick={() => handleCopyTo(tab.id)}
                                 className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                             >
                                 {tab.name}

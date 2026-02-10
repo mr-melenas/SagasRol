@@ -15,6 +15,7 @@ interface SheetState {
   moveBlocks: (activeId: string, overId: string) => void;
   moveBlockToGroup: (activeId: string, groupId: string) => void;
   moveBlockToTab: (blockId: string, targetTabId: string) => void;
+  duplicateBlock: (blockId: string, targetTabId?: string) => void;
   
   // Tab Actions
   addTab: (name: string) => void;
@@ -49,6 +50,19 @@ const updateBlockRecursive = (blocks: SheetBlock[], id: string, updater: (b: She
         }
         return block;
     }).filter(Boolean) as SheetBlock[];
+};
+
+// Helper for deep cloning blocks with new IDs
+const deepCloneBlock = (block: SheetBlock, tabIdOverride?: string): SheetBlock => {
+    const newId = uuidv4();
+    const newBlock: SheetBlock = {
+        ...block,
+        id: newId,
+        label: `${block.label} (Copy)`,
+        tabId: tabIdOverride || block.tabId,
+        children: block.children ? block.children.map(child => deepCloneBlock(child, tabIdOverride)) : undefined
+    };
+    return newBlock;
 };
 
 export const useSheetStore = create<SheetState>((set) => ({
@@ -259,6 +273,57 @@ export const useSheetStore = create<SheetState>((set) => ({
       // This is a simplification: moving to another tab puts it at the root of that tab.
       // We append it to the end of the root blocks list.
       newBlocks.push(block);
+
+      return { blocks: newBlocks };
+  }),
+
+  duplicateBlock: (blockId, targetTabId) => set((state) => {
+      const blockPath = findBlockPath(state.blocks, blockId);
+      if (!blockPath) return { blocks: state.blocks };
+
+      const newBlocks = JSON.parse(JSON.stringify(state.blocks));
+
+      // Get parent array and original block
+      // We need to traverse down to the parent of the block
+      let parentArray = newBlocks;
+      // If path length is 1, it's at root level. 
+      // If path length > 1, we traverse to the group containing it.
+      
+      for (let i = 0; i < blockPath.length - 1; i++) {
+          // If we are at root, parentArray is newBlocks (which is an array)
+          // If we are deeper, parentArray[index] is a block, and we want its .children
+          
+          const currentIndex = blockPath[i];
+          
+          if (!parentArray[currentIndex]) {
+               console.error("Block not found during traversal");
+               return { blocks: state.blocks };
+          }
+
+          if (parentArray[currentIndex].children) {
+              parentArray = parentArray[currentIndex].children!;
+          } else {
+              // Should not happen if path is correct and logic assumes structure
+              console.error("Path indicates children but none found");
+              return { blocks: state.blocks };
+          }
+      }
+      
+      const index = blockPath[blockPath.length - 1];
+      const originalBlock = parentArray[index];
+      
+      if (!originalBlock) return { blocks: state.blocks };
+
+      // Clone
+      const clonedBlock = deepCloneBlock(originalBlock, targetTabId);
+
+      if (targetTabId) {
+          // Case A: Copy to another tab
+          newBlocks.push(clonedBlock);
+      } else {
+          // Case B: Duplicate in-place (same parent)
+          parentArray.splice(index + 1, 0, clonedBlock);
+      }
 
       return { blocks: newBlocks };
   }),

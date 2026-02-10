@@ -13,9 +13,10 @@ interface BlockWrapperProps {
   children: React.ReactNode;
   isOverlay?: boolean;
   mode?: SheetMode;
+  onContextMenu?: (e: React.MouseEvent, block: SheetBlock) => void;
 }
 
-const BlockWrapper: React.FC<BlockWrapperProps> = ({ block, children, isOverlay, mode = 'BUILDER' }) => {
+const BlockWrapper: React.FC<BlockWrapperProps> = ({ block, children, isOverlay, mode = 'BUILDER', onContextMenu }) => {
     const { removeBlock, updateLabel } = useSheetStore();
     
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ 
@@ -47,6 +48,12 @@ const BlockWrapper: React.FC<BlockWrapperProps> = ({ block, children, isOverlay,
             ref={isOverlay || mode === 'PLAYER' ? null : setNodeRef} 
             style={isOverlay || mode === 'PLAYER' ? {} : style} 
             className={`relative group ${bgColor} border ${borderColor} rounded-lg ${mode === 'PLAYER' ? 'p-1' : 'p-3 shadow-sm hover:shadow-md'} transition-all ${overlayStyle}`}
+            onContextMenu={(e) => {
+                if (mode === 'BUILDER' && onContextMenu) {
+                    e.stopPropagation(); // CRITICAL: Stop bubbling to parent group
+                    onContextMenu(e, block);
+                }
+            }}
         >
             {/* Controls - Hide in PLAYER mode */}
             {mode === 'BUILDER' && (
@@ -103,11 +110,12 @@ export interface BlockProps {
     // For GroupBlock recursion
     getValue?: (id: string) => any;
     onBlockChange?: (id: string, val: any) => void;
+    onContextMenu?: (e: React.MouseEvent, block: SheetBlock) => void;
 }
 
-const StatBlockBase: React.FC<BlockProps> = ({ block, isOverlay, mode = 'BUILDER', value, onValueChange }) => {
+const StatBlockBase: React.FC<BlockProps> = ({ block, isOverlay, mode = 'BUILDER', value, onValueChange, onContextMenu }) => {
     return (
-        <BlockWrapper block={block} isOverlay={isOverlay} mode={mode}>
+        <BlockWrapper block={block} isOverlay={isOverlay} mode={mode} onContextMenu={onContextMenu}>
             <div className="flex flex-col items-center">
                 {mode === 'PLAYER' ? (
                     <input 
@@ -128,7 +136,7 @@ const StatBlockBase: React.FC<BlockProps> = ({ block, isOverlay, mode = 'BUILDER
 };
 export const StatBlock = React.memo(StatBlockBase);
 
-const ResourceBlockBase: React.FC<BlockProps> = ({ block, isOverlay, mode = 'BUILDER', value, onValueChange }) => {
+const ResourceBlockBase: React.FC<BlockProps> = ({ block, isOverlay, mode = 'BUILDER', value, onValueChange, onContextMenu }) => {
     const { updateConfig } = useSheetStore();
 
     // Parse values safely
@@ -150,7 +158,7 @@ const ResourceBlockBase: React.FC<BlockProps> = ({ block, isOverlay, mode = 'BUI
     const percentage = Math.min(100, Math.max(0, ((current || 0) / (max || 1)) * 100));
 
     return (
-        <BlockWrapper block={block} isOverlay={isOverlay} mode={mode}>
+        <BlockWrapper block={block} isOverlay={isOverlay} mode={mode} onContextMenu={onContextMenu}>
             <div className="flex flex-col w-full">
                 <div className="flex justify-between items-center mb-1">
                      <div className="flex items-center gap-2">
@@ -203,9 +211,9 @@ const ResourceBlockBase: React.FC<BlockProps> = ({ block, isOverlay, mode = 'BUI
 };
 export const ResourceBlock = React.memo(ResourceBlockBase);
 
-const SkillBlockBase: React.FC<BlockProps> = ({ block, isOverlay, mode = 'BUILDER', value, onValueChange }) => {
+const SkillBlockBase: React.FC<BlockProps> = ({ block, isOverlay, mode = 'BUILDER', value, onValueChange, onContextMenu }) => {
     return (
-        <BlockWrapper block={block} isOverlay={isOverlay} mode={mode}>
+        <BlockWrapper block={block} isOverlay={isOverlay} mode={mode} onContextMenu={onContextMenu}>
             <div className="flex items-center gap-2">
                 {mode === 'PLAYER' ? (
                     <input 
@@ -228,11 +236,11 @@ const SkillBlockBase: React.FC<BlockProps> = ({ block, isOverlay, mode = 'BUILDE
 };
 export const SkillBlock = React.memo(SkillBlockBase);
 
-const TextBlockBase: React.FC<BlockProps> = ({ block, isOverlay, mode = 'BUILDER', value, onValueChange }) => {
+const TextBlockBase: React.FC<BlockProps> = ({ block, isOverlay, mode = 'BUILDER', value, onValueChange, onContextMenu }) => {
     const { updateConfig } = useSheetStore();
     
     return (
-        <BlockWrapper block={block} isOverlay={isOverlay} mode={mode}>
+        <BlockWrapper block={block} isOverlay={isOverlay} mode={mode} onContextMenu={onContextMenu}>
             <textarea 
                 className="w-full h-24 border border-gray-200 rounded bg-gray-50 p-2 text-sm text-gray-700 focus:outline-none focus:border-blue-500 resize-none"
                 placeholder="Write default text or instructions here..."
@@ -252,7 +260,7 @@ const TextBlockBase: React.FC<BlockProps> = ({ block, isOverlay, mode = 'BUILDER
 };
 export const TextBlock = React.memo(TextBlockBase);
 
-const InlineFieldBlockBase: React.FC<BlockProps> = ({ block, isOverlay, mode = 'BUILDER', value, onValueChange }) => {
+const InlineFieldBlockBase: React.FC<BlockProps> = ({ block, isOverlay, mode = 'BUILDER', value, onValueChange, onContextMenu }) => {
     const { updateLabel } = useSheetStore();
 
     const labelValue = block.label || "Label";
@@ -261,7 +269,7 @@ const InlineFieldBlockBase: React.FC<BlockProps> = ({ block, isOverlay, mode = '
         : labelValue;
 
     return (
-        <BlockWrapper block={block} isOverlay={isOverlay} mode={mode}>
+        <BlockWrapper block={block} isOverlay={isOverlay} mode={mode} onContextMenu={onContextMenu}>
             <div className="flex items-end gap-2 w-full">
                 <div className="grid items-center max-w-[80%] relative">
                     <span 
@@ -305,11 +313,11 @@ const InlineFieldBlockBase: React.FC<BlockProps> = ({ block, isOverlay, mode = '
 };
 export const InlineFieldBlock = React.memo(InlineFieldBlockBase);
 
-const SimpleInputBlockBase: React.FC<BlockProps> = ({ block, isOverlay, mode = 'BUILDER', value, onValueChange }) => {
+const SimpleInputBlockBase: React.FC<BlockProps> = ({ block, isOverlay, mode = 'BUILDER', value, onValueChange, onContextMenu }) => {
     const { updateConfig } = useSheetStore();
 
     return (
-        <BlockWrapper block={block} isOverlay={isOverlay} mode={mode}>
+        <BlockWrapper block={block} isOverlay={isOverlay} mode={mode} onContextMenu={onContextMenu}>
              {mode === 'PLAYER' ? (
                 <input 
                     type="text" 
@@ -337,11 +345,11 @@ const SimpleInputBlockBase: React.FC<BlockProps> = ({ block, isOverlay, mode = '
 };
 export const SimpleInputBlock = React.memo(SimpleInputBlockBase);
 
-const CustomSkillBlockBase: React.FC<BlockProps> = ({ block, isOverlay, mode = 'BUILDER', value, onValueChange }) => {
+const CustomSkillBlockBase: React.FC<BlockProps> = ({ block, isOverlay, mode = 'BUILDER', value, onValueChange, onContextMenu }) => {
     const { updateLabel } = useSheetStore();
 
     return (
-        <BlockWrapper block={block} isOverlay={isOverlay} mode={mode}>
+        <BlockWrapper block={block} isOverlay={isOverlay} mode={mode} onContextMenu={onContextMenu}>
             <div className="flex items-center gap-2">
                 {mode === 'PLAYER' ? (
                      <input 
@@ -382,7 +390,7 @@ const CustomSkillBlockBase: React.FC<BlockProps> = ({ block, isOverlay, mode = '
 };
 export const CustomSkillBlock = React.memo(CustomSkillBlockBase);
 
-const GroupBlockBase: React.FC<BlockProps> = ({ block, isOverlay, mode = 'BUILDER', getValue, onBlockChange }) => {
+const GroupBlockBase: React.FC<BlockProps> = ({ block, isOverlay, mode = 'BUILDER', getValue, onBlockChange, onContextMenu }) => {
     const { updateConfig } = useSheetStore();
     const { setNodeRef: setDroppableRef, isOver } = useDroppable({
         id: `${block.id}-placeholder`,
@@ -417,14 +425,14 @@ const GroupBlockBase: React.FC<BlockProps> = ({ block, isOverlay, mode = 'BUILDE
             {block.children && block.children.length > 0 ? (
                 block.children.map(child => (
                     <div key={child.id} className="relative">
-                        {child.type === 'STAT' && <StatBlock block={child} mode={mode} value={getValue?.(child.id)} onValueChange={(v) => onBlockChange?.(child.id, v)} />}
-                        {child.type === 'RESOURCE' && <ResourceBlock block={child} mode={mode} value={getValue?.(child.id)} onValueChange={(v) => onBlockChange?.(child.id, v)} />}
-                        {child.type === 'TEXT' && <TextBlock block={child} mode={mode} />}
-                        {child.type === 'INLINE_FIELD' && <InlineFieldBlock block={child} mode={mode} value={getValue?.(child.id)} onValueChange={(v) => onBlockChange?.(child.id, v)} />}
-                        {child.type === 'SIMPLE_INPUT' && <SimpleInputBlock block={child} mode={mode} value={getValue?.(child.id)} onValueChange={(v) => onBlockChange?.(child.id, v)} />}
-                        {child.type === 'SKILL' && <SkillBlock block={child} mode={mode} value={getValue?.(child.id)} onValueChange={(v) => onBlockChange?.(child.id, v)} />}
-                        {child.type === 'CUSTOM_SKILL' && <CustomSkillBlock block={child} mode={mode} value={getValue?.(child.id)} onValueChange={(v) => onBlockChange?.(child.id, v)} />}
-                        {child.type === 'GROUP' && <GroupBlock block={child} mode={mode} getValue={getValue} onBlockChange={onBlockChange} />}
+                        {child.type === 'STAT' && <StatBlock block={child} mode={mode} value={getValue?.(child.id)} onValueChange={(v) => onBlockChange?.(child.id, v)} onContextMenu={onContextMenu} />}
+                        {child.type === 'RESOURCE' && <ResourceBlock block={child} mode={mode} value={getValue?.(child.id)} onValueChange={(v) => onBlockChange?.(child.id, v)} onContextMenu={onContextMenu} />}
+                        {child.type === 'TEXT' && <TextBlock block={child} mode={mode} onContextMenu={onContextMenu} />}
+                        {child.type === 'INLINE_FIELD' && <InlineFieldBlock block={child} mode={mode} value={getValue?.(child.id)} onValueChange={(v) => onBlockChange?.(child.id, v)} onContextMenu={onContextMenu} />}
+                        {child.type === 'SIMPLE_INPUT' && <SimpleInputBlock block={child} mode={mode} value={getValue?.(child.id)} onValueChange={(v) => onBlockChange?.(child.id, v)} onContextMenu={onContextMenu} />}
+                        {child.type === 'SKILL' && <SkillBlock block={child} mode={mode} value={getValue?.(child.id)} onValueChange={(v) => onBlockChange?.(child.id, v)} onContextMenu={onContextMenu} />}
+                        {child.type === 'CUSTOM_SKILL' && <CustomSkillBlock block={child} mode={mode} value={getValue?.(child.id)} onValueChange={(v) => onBlockChange?.(child.id, v)} onContextMenu={onContextMenu} />}
+                        {child.type === 'GROUP' && <GroupBlock block={child} mode={mode} getValue={getValue} onBlockChange={onBlockChange} onContextMenu={onContextMenu} />}
                     </div>
                 ))
             ) : (
@@ -440,7 +448,7 @@ const GroupBlockBase: React.FC<BlockProps> = ({ block, isOverlay, mode = 'BUILDE
     );
 
     return (
-        <BlockWrapper block={block} isOverlay={isOverlay} mode={mode}>
+        <BlockWrapper block={block} isOverlay={isOverlay} mode={mode} onContextMenu={onContextMenu}>
             <div className={`min-h-[100px] border-2 border-dashed rounded-lg p-2 mt-2 transition-colors ${
                 isOver && mode === 'BUILDER' ? 'bg-blue-500/10 border-blue-500 ring-2 ring-blue-200' : 'border-indigo-200 bg-indigo-50/30'
             }`}>

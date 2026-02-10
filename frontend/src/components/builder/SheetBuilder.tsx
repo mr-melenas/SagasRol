@@ -119,17 +119,18 @@ export const SheetBuilder: React.FC = () => {
             <div 
                 key={block.id} 
                 className={className}
-                onContextMenu={(e) => !isOverlay && handleContextMenu(e, block)}
+                // onContextMenu is now handled inside the block wrapper to support nesting
+                // onContextMenu={(e) => !isOverlay && handleContextMenu(e, block)}
             >
-                {block.type === 'STAT' && <StatBlock block={block} isOverlay={isOverlay} />}
-                {block.type === 'RESOURCE' && <ResourceBlock block={block} isOverlay={isOverlay} />}
-                {block.type === 'TEXT' && <TextBlock block={block} isOverlay={isOverlay} />}
-                {block.type === 'INLINE_FIELD' && <InlineFieldBlock block={block} isOverlay={isOverlay} />}
-                {block.type === 'SIMPLE_INPUT' && <SimpleInputBlock block={block} isOverlay={isOverlay} />}
-                {block.type === 'SKILL' && <SkillBlock block={block} isOverlay={isOverlay} />}
-                {block.type === 'CUSTOM_SKILL' && <CustomSkillBlock block={block} isOverlay={isOverlay} />}
-                {block.type === 'CHARACTER_IMAGE' && <AvatarBlock block={block} isOverlay={isOverlay} />}
-                {block.type === 'GROUP' && <GroupBlock block={block} isOverlay={isOverlay} />}
+                {block.type === 'STAT' && <StatBlock block={block} isOverlay={isOverlay} onContextMenu={handleContextMenu} />}
+                {block.type === 'RESOURCE' && <ResourceBlock block={block} isOverlay={isOverlay} onContextMenu={handleContextMenu} />}
+                {block.type === 'TEXT' && <TextBlock block={block} isOverlay={isOverlay} onContextMenu={handleContextMenu} />}
+                {block.type === 'INLINE_FIELD' && <InlineFieldBlock block={block} isOverlay={isOverlay} onContextMenu={handleContextMenu} />}
+                {block.type === 'SIMPLE_INPUT' && <SimpleInputBlock block={block} isOverlay={isOverlay} onContextMenu={handleContextMenu} />}
+                {block.type === 'SKILL' && <SkillBlock block={block} isOverlay={isOverlay} onContextMenu={handleContextMenu} />}
+                {block.type === 'CUSTOM_SKILL' && <CustomSkillBlock block={block} isOverlay={isOverlay} onContextMenu={handleContextMenu} />}
+                {block.type === 'CHARACTER_IMAGE' && <AvatarBlock block={block} isOverlay={isOverlay} onContextMenu={handleContextMenu} />}
+                {block.type === 'GROUP' && <GroupBlock block={block} isOverlay={isOverlay} onContextMenu={handleContextMenu} />}
             </div>
         );
     };
