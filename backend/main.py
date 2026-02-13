@@ -18,7 +18,7 @@ if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
 
 from backend import models, database, schemas, auth
-from backend.routers import universes, sheets
+from backend.routers import universes, sheets, campaigns
 
 models.Base.metadata.create_all(bind=database.engine)
 
@@ -50,6 +50,7 @@ socket_app = socketio.ASGIApp(sio, app)
 # Include Routers
 app.include_router(universes.router, tags=["universes"])
 app.include_router(sheets.router, tags=["sheets"])
+app.include_router(campaigns.router, tags=["campaigns"])
 
 @app.get("/")
 def read_root():
@@ -62,20 +63,20 @@ async def read_users_me(current_user: models.User = Depends(auth.get_current_use
 # ... (Rest of endpoints using Depends(auth.get_current_user) will now use Clerk)
 
 # Campaign Endpoints
-@app.post("/campaigns/", response_model=schemas.Campaign)
-def create_campaign(campaign: schemas.CampaignCreate, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
-    # Role logic removed
-    # if current_user.role != models.UserRole.GM:
-    #    raise HTTPException(status_code=403, detail="Only GMs can create campaigns")
-    db_campaign = models.Campaign(name=campaign.name, gm_id=current_user.id)
-    db.add(db_campaign)
-    db.commit()
-    db.refresh(db_campaign)
-    return db_campaign
-
-@app.get("/campaigns/", response_model=List[schemas.Campaign])
-def read_campaigns(db: Session = Depends(database.get_db)):
-    return db.query(models.Campaign).all()
+# @app.post("/campaigns/", response_model=schemas.Campaign)
+# def create_campaign(campaign: schemas.CampaignCreate, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
+#    # Role logic removed
+#    # if current_user.role != models.UserRole.GM:
+#    #    raise HTTPException(status_code=403, detail="Only GMs can create campaigns")
+#    db_campaign = models.Campaign(name=campaign.name, gm_id=current_user.id)
+#    db.add(db_campaign)
+#    db.commit()
+#    db.refresh(db_campaign)
+#    return db_campaign
+#
+# @app.get("/campaigns/", response_model=List[schemas.Campaign])
+# def read_campaigns(db: Session = Depends(database.get_db)):
+#    return db.query(models.Campaign).all()
 
 # Character Endpoints
 @app.post("/characters/", response_model=schemas.Character)
@@ -85,6 +86,10 @@ def create_character(character: schemas.CharacterCreate, db: Session = Depends(d
     db.commit()
     db.refresh(db_character)
     return db_character
+
+@app.get("/my-characters/", response_model=List[schemas.Character])
+def read_my_characters(db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
+    return db.query(models.Character).filter(models.Character.user_id == current_user.id).all()
 
 def recalculate_stats(character: models.Character, db: Session):
     base_stats = character.stats.copy() if character.stats else {}
@@ -116,6 +121,26 @@ def read_character(character_id: int, db: Session = Depends(database.get_db)):
     # To properly return this via Pydantic, we might need a separate schema or just override the dict
     character.stats = effective_stats 
     return character
+
+@app.put("/characters/{character_id}", response_model=schemas.Character)
+def update_character(character_id: int, character_update: schemas.CharacterUpdate, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
+    db_character = db.query(models.Character).filter(models.Character.id == character_id).first()
+    if not db_character:
+        raise HTTPException(status_code=404, detail="Character not found")
+    
+    if db_character.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    if character_update.name is not None:
+        db_character.name = character_update.name
+    if character_update.stats is not None:
+        db_character.stats = character_update.stats
+    if character_update.image_url is not None:
+        db_character.image_url = character_update.image_url
+
+    db.commit()
+    db.refresh(db_character)
+    return db_character
 
 # Inventory Endpoints
 @app.post("/characters/{character_id}/inventory/", response_model=schemas.InventoryItem)

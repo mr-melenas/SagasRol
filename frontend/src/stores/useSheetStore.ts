@@ -1,10 +1,12 @@
 import { create } from 'zustand';
-import { SheetBlock, BlockType } from '../types';
+import { SheetBlock, BlockType, SheetTab } from '../types';
 import { arrayMove } from '@dnd-kit/sortable';
 import { v4 as uuidv4 } from 'uuid';
 
 interface SheetState {
   blocks: SheetBlock[];
+  tabs: SheetTab[];
+  activeTabId: string;
   setBlocks: (blocks: SheetBlock[]) => void;
   addBlock: (type: BlockType, parentId?: string) => void;
   removeBlock: (id: string) => void;
@@ -12,10 +14,18 @@ interface SheetState {
   updateConfig: (id: string, config: any) => void;
   moveBlocks: (activeId: string, overId: string) => void;
   moveBlockToGroup: (activeId: string, groupId: string) => void;
+  moveBlockToTab: (blockId: string, targetTabId: string) => void;
+  duplicateBlock: (blockId: string, targetTabId?: string) => void;
+  
+  // Tab Actions
+  addTab: (name: string) => void;
+  setActiveTab: (id: string) => void;
+  updateTabName: (id: string, newName: string) => void;
+  deleteTab: (id: string) => void;
+  setTabs: (tabs: SheetTab[]) => void;
 }
 
-// Helper to find the path to a block: [rootIndex, childIndex, childIndex...]
-// This helps in precise location finding for deep nesting
+// ... helpers (keep existing ones) ...
 const findBlockPath = (blocks: SheetBlock[], id: string, currentPath: number[] = []): number[] | null => {
     for (let i = 0; i < blocks.length; i++) {
         if (blocks[i].id === id) {
@@ -27,20 +37,6 @@ const findBlockPath = (blocks: SheetBlock[], id: string, currentPath: number[] =
         }
     }
     return null;
-};
-
-// Helper to get block at path
-const getBlockAtPath = (blocks: SheetBlock[], path: number[]): SheetBlock | null => {
-    let current = blocks;
-    let block: SheetBlock | null = null;
-    
-    for (let i = 0; i < path.length; i++) {
-        const index = path[i];
-        if (!current || !current[index]) return null;
-        block = current[index];
-        current = block.children || [];
-    }
-    return block;
 };
 
 // Helper to recursively find and update/remove blocks
@@ -56,37 +52,92 @@ const updateBlockRecursive = (blocks: SheetBlock[], id: string, updater: (b: She
     }).filter(Boolean) as SheetBlock[];
 };
 
-const findBlockParent = (blocks: SheetBlock[], id: string): SheetBlock | null => {
-    for (const block of blocks) {
-        if (block.children?.some(child => child.id === id)) return block;
-        if (block.children) {
-            const found = findBlockParent(block.children, id);
-            if (found) return found;
-        }
-    }
-    return null;
+// Helper for deep cloning blocks with new IDs
+const deepCloneBlock = (block: SheetBlock, tabIdOverride?: string): SheetBlock => {
+    const newId = uuidv4();
+    const newBlock: SheetBlock = {
+        ...block,
+        id: newId,
+        label: `${block.label} (Copy)`,
+        tabId: tabIdOverride || block.tabId,
+        children: block.children ? block.children.map(child => deepCloneBlock(child, tabIdOverride)) : undefined
+    };
+    return newBlock;
 };
 
 export const useSheetStore = create<SheetState>((set) => ({
   blocks: [],
-  setBlocks: (blocks) => set({ blocks }),
+  tabs: [
+      { id: 'tab-main', name: 'Principal' }
+  ],
+  activeTabId: 'tab-main',
+
+  setBlocks: (blocks) => set((state) => {
+      // Migration: If blocks don't have tabId, assign them to the first tab (or active tab)
+      const migratedBlocks = blocks.map(b => {
+          if (!b.tabId) {
+              return { ...b, tabId: 'tab-main' };
+          }
+          return b;
+      });
+      return { blocks: migratedBlocks };
+  }),
+
+  // Tab Actions
+  addTab: (name) => set((state) => {
+      const newTab = { id: uuidv4(), name };
+      return { 
+          tabs: [...state.tabs, newTab],
+          activeTabId: newTab.id
+      };
+  }),
+
+  setActiveTab: (id) => set({ activeTabId: id }),
+
+  updateTabName: (id, newName) => set((state) => ({
+      tabs: state.tabs.map(t => t.id === id ? { ...t, name: newName } : t)
+  })),
+
+  deleteTab: (id) => set((state) => {
+      // Don't delete if it's the only tab
+      if (state.tabs.length <= 1) return state;
+      
+      const newTabs = state.tabs.filter(t => t.id !== id);
+      const newActiveId = state.activeTabId === id ? newTabs[0].id : state.activeTabId;
+      
+      // Also remove blocks belonging to this tab
+      const newBlocks = state.blocks.filter(b => b.tabId !== id);
+
+      return {
+          tabs: newTabs,
+          activeTabId: newActiveId,
+          blocks: newBlocks
+      };
+  }),
+
+  setTabs: (tabs) => set({ tabs }),
+
   addBlock: (type, parentId) => set((state) => {
     const newBlock: SheetBlock = {
         id: uuidv4(),
         type,
+        tabId: state.activeTabId, // Assign to current tab
         label: type === 'STAT' ? 'New Stat' : 
                type === 'RESOURCE' ? 'New Resource' : 
                type === 'SKILL' ? 'New Skill' :
                type === 'GROUP' ? 'New Group' : 
                type === 'INLINE_FIELD' ? 'Label' :
                type === 'SIMPLE_INPUT' ? 'Input' :
-               type === 'CUSTOM_SKILL' ? 'Skill Name' : 'New Text',
+               type === 'CUSTOM_SKILL' ? 'Skill Name' : 
+               type === 'CHARACTER_IMAGE' ? 'Character Portrait' : 
+               type === 'PLAYER_NOTE' ? 'Label' : 'New Text',
         children: type === 'GROUP' ? [] : undefined,
         config: {
             color: type === 'RESOURCE' ? '#ef4444' : undefined,
             direction: 'col',
             columns: 1,
-            placeholder: type === 'SIMPLE_INPUT' ? 'Placeholder...' : undefined
+            placeholder: type === 'SIMPLE_INPUT' || type === 'PLAYER_NOTE' ? 'Placeholder...' : undefined,
+            avatarShape: type === 'CHARACTER_IMAGE' ? 'square' : undefined
         }
     };
 
@@ -99,6 +150,11 @@ export const useSheetStore = create<SheetState>((set) => ({
         };
     }
     
+    // Suggest placement for Avatar: Top of list if it's the first one
+    if (type === 'CHARACTER_IMAGE') {
+        return { blocks: [newBlock, ...state.blocks] };
+    }
+
     return { blocks: [...state.blocks, newBlock] };
   }),
   
@@ -115,15 +171,20 @@ export const useSheetStore = create<SheetState>((set) => ({
   })),
 
   moveBlocks: (activeId, overId) => set((state) => {
+    // ... (Keep existing logic, dnd-kit handles sorting within the filtered list in UI, 
+    // but here we operate on the full list. We rely on finding indices in the global list.
+    // This works fine as long as uniqueness of IDs is preserved.)
     const activePath = findBlockPath(state.blocks, activeId);
     const overPath = findBlockPath(state.blocks, overId);
 
     if (!activePath || !overPath) return { blocks: state.blocks };
 
-    // Deep clone to avoid mutation issues
+    // Deep clone
     const newBlocks = JSON.parse(JSON.stringify(state.blocks));
     
-    // Find parent arrays
+    // ... (rest of the logic remains same as it relies on finding by ID in the full tree)
+    
+    // Helper inside
     const getParentArray = (root: SheetBlock[], path: number[]) => {
         let current = root;
         for (let i = 0; i < path.length - 1; i++) {
@@ -132,58 +193,24 @@ export const useSheetStore = create<SheetState>((set) => ({
         return current;
     };
 
-    const activeParentArray = getParentArray(newBlocks, activePath);
-    const activeIndex = activePath[activePath.length - 1];
-    const activeBlock = activeParentArray[activeIndex];
-
-    // Remove active block
-    activeParentArray.splice(activeIndex, 1);
-
-    // If we are moving to a position that was affected by the removal (same parent and overIndex > activeIndex)
-    // we need to adjust the over path or index.
-    // Re-calculate overPath in the modified tree?
-    // It's safer to find the overBlock and its parent in the modified tree, 
-    // BUT since we just removed an item, indices might have shifted.
-    
-    // Strategy: 
-    // 1. Find active block and remove it.
-    // 2. Find over block (re-search by ID because indices might have changed).
-    // 3. Insert active block relative to over block.
-
-    // Let's restart with this safer strategy
-    const cleanBlocks = JSON.parse(JSON.stringify(state.blocks));
-    
     // 1. Locate and extract Active Block
-    const pathA = findBlockPath(cleanBlocks, activeId);
-    if (!pathA) return { blocks: state.blocks }; // Should not happen
-    
-    const parentListA = getParentArray(cleanBlocks, pathA);
-    const indexA = pathA[pathA.length - 1];
+    // Need to find path in newBlocks because it's a clone
+    // Since we just cloned, paths are same.
+    const parentListA = getParentArray(newBlocks, activePath);
+    const indexA = activePath[activePath.length - 1];
     const [extractedBlock] = parentListA.splice(indexA, 1);
 
     // 2. Locate Over Block (after removal)
-    const pathO = findBlockPath(cleanBlocks, overId);
-    if (!pathO) {
-        // Fallback: if overId is gone? shouldn't happen unless activeId == overId
-        return { blocks: state.blocks }; 
-    }
+    // Re-find path because removal might have shifted indices
+    const pathO = findBlockPath(newBlocks, overId);
+    if (!pathO) return { blocks: state.blocks };
 
-    const parentListO = getParentArray(cleanBlocks, pathO);
+    const parentListO = getParentArray(newBlocks, pathO);
     const indexO = pathO[pathO.length - 1];
 
-    // 3. Insert
-    // dnd-kit usually expects "swap" or "insert before/after". 
-    // arrayMove logic: if same container, move to new index.
-    // if different container, insert at indexO.
-    
-    // If we are just reordering in the same list, we want to mimic arrayMove behavior
-    // But since we already removed it, we just insert at indexO.
-    // HOWEVER, if indexA < indexO in the same list, indexO has shifted down by 1.
-    // But we re-searched pathO, so indexO is correct in the *current* state (without A).
-    
     parentListO.splice(indexO, 0, extractedBlock);
 
-    return { blocks: cleanBlocks };
+    return { blocks: newBlocks };
   }),
 
   moveBlockToGroup: (activeId, groupId) => set((state) => {
@@ -220,5 +247,85 @@ export const useSheetStore = create<SheetState>((set) => ({
     groupBlock.children.push(activeBlock);
 
     return { blocks: newBlocks };
+  }),
+
+  moveBlockToTab: (blockId, targetTabId) => set((state) => {
+      // 1. Find and extract the block from its current location
+      const blockPath = findBlockPath(state.blocks, blockId);
+      if (!blockPath) return { blocks: state.blocks };
+
+      const newBlocks = JSON.parse(JSON.stringify(state.blocks));
+
+      // Get parent array
+      let current = newBlocks;
+      for (let i = 0; i < blockPath.length - 1; i++) {
+          current = current[blockPath[i]].children!;
+      }
+      const parentArray = current;
+      const index = blockPath[blockPath.length - 1];
+
+      // Extract block
+      const [block] = parentArray.splice(index, 1);
+
+      // 2. Update block's tabId
+      block.tabId = targetTabId;
+
+      // 3. If block was nested, it will now become a top-level block in the new tab
+      // This is a simplification: moving to another tab puts it at the root of that tab.
+      // We append it to the end of the root blocks list.
+      newBlocks.push(block);
+
+      return { blocks: newBlocks };
+  }),
+
+  duplicateBlock: (blockId, targetTabId) => set((state) => {
+      const blockPath = findBlockPath(state.blocks, blockId);
+      if (!blockPath) return { blocks: state.blocks };
+
+      const newBlocks = JSON.parse(JSON.stringify(state.blocks));
+
+      // Get parent array and original block
+      // We need to traverse down to the parent of the block
+      let parentArray = newBlocks;
+      // If path length is 1, it's at root level. 
+      // If path length > 1, we traverse to the group containing it.
+      
+      for (let i = 0; i < blockPath.length - 1; i++) {
+          // If we are at root, parentArray is newBlocks (which is an array)
+          // If we are deeper, parentArray[index] is a block, and we want its .children
+          
+          const currentIndex = blockPath[i];
+          
+          if (!parentArray[currentIndex]) {
+               console.error("Block not found during traversal");
+               return { blocks: state.blocks };
+          }
+
+          if (parentArray[currentIndex].children) {
+              parentArray = parentArray[currentIndex].children!;
+          } else {
+              // Should not happen if path is correct and logic assumes structure
+              console.error("Path indicates children but none found");
+              return { blocks: state.blocks };
+          }
+      }
+      
+      const index = blockPath[blockPath.length - 1];
+      const originalBlock = parentArray[index];
+      
+      if (!originalBlock) return { blocks: state.blocks };
+
+      // Clone
+      const clonedBlock = deepCloneBlock(originalBlock, targetTabId);
+
+      if (targetTabId) {
+          // Case A: Copy to another tab
+          newBlocks.push(clonedBlock);
+      } else {
+          // Case B: Duplicate in-place (same parent)
+          parentArray.splice(index + 1, 0, clonedBlock);
+      }
+
+      return { blocks: newBlocks };
   }),
 }));

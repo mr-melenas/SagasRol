@@ -4,6 +4,9 @@ import { CharacterSheet } from './pages/CharacterSheet';
 import { CreateUniverse } from './pages/CreateUniverse';
 import { UniverseSettings } from './pages/UniverseSettings';
 import { SheetManager } from './pages/SheetManager';
+import { CreateCharacter } from './pages/characters/CreateCharacter';
+import { CampaignsDashboard } from './pages/campaigns';
+import { TestPlayerMode } from './pages/TestPlayerMode';
 import { 
   SignedIn, 
   SignedOut, 
@@ -15,7 +18,7 @@ import {
 } from "@clerk/clerk-react";
 import { useEffect, useState } from 'react';
 import axios from 'axios';
-import { Universe } from './types';
+import { Universe, Character } from './types';
 
 // Component to sync Clerk user with Backend
 function AuthSync() {
@@ -48,43 +51,59 @@ function Dashboard() {
   const { getToken } = useAuth();
   const navigate = useNavigate();
   const [universes, setUniverses] = useState<Universe[]>([]);
+  const [characters, setCharacters] = useState<Character[]>([]);
   const [loadingUniverses, setLoadingUniverses] = useState(true);
+  const [loadingCharacters, setLoadingCharacters] = useState(true);
 
   useEffect(() => {
-      const fetchUniverses = async () => {
+      const fetchData = async () => {
           try {
               const token = await getToken();
-              const res = await axios.get('http://localhost:8000/universes/', {
-                  headers: { Authorization: `Bearer ${token}` }
-              });
-              setUniverses(res.data);
+              const headers = { Authorization: `Bearer ${token}` };
+              
+              const [universesRes, charactersRes] = await Promise.all([
+                  axios.get('http://localhost:8000/universes/', { headers }),
+                  axios.get('http://localhost:8000/my-characters/', { headers })
+              ]);
+              
+              console.log("Universes Response:", universesRes.data);
+              console.log("Characters Response:", charactersRes.data);
+
+              setUniverses(universesRes.data);
+              setCharacters(charactersRes.data);
           } catch (err) {
-              console.error("Failed to fetch universes", err);
+              console.error("Failed to fetch data", err);
           } finally {
               setLoadingUniverses(false);
+              setLoadingCharacters(false);
           }
       };
-      if (user) fetchUniverses();
+      if (user) fetchData();
   }, [user, getToken]);
   
   const handleCreateCampaign = () => {
-    // Logic to open create campaign modal or navigate to create campaign page
-    console.log("Create campaign clicked");
+    navigate('/campaigns');
   };
 
   const handleJoinCampaign = () => {
-    // Logic to open join campaign modal
-    console.log("Join campaign clicked");
+    navigate('/campaigns');
   };
 
   const handleCreateUniverse = () => {
     navigate('/create-universe');
   };
 
+  const handleCreateCharacter = () => {
+    navigate('/characters/create');
+  };
+
   return (
     <div className="p-8">
       <div className="flex justify-between items-center mb-8">
-        <h1 className="text-2xl">Welcome, {user?.firstName || user?.username || "Traveler"}</h1>
+        <div>
+            <h1 className="text-2xl">Welcome, {user?.firstName || user?.username || "Traveler"}</h1>
+            <p className="text-xs text-gray-400">ID: {user?.id}</p>
+        </div>
         <div className="flex gap-4 items-center">
              {/* UserButton removed from here as it is already in the header */}
         </div>
@@ -173,6 +192,66 @@ function Dashboard() {
                 </div>
             )}
         </div>
+
+        {/* My Characters Section - New Section */}
+        <div className="lg:col-span-3 border p-6 rounded bg-gray-50">
+            <div className="flex justify-between items-center mb-6">
+                <div>
+                    <h3 className="font-bold text-xl">My Characters</h3>
+                    <p className="text-gray-500 text-sm">Manage your heroes and adventurers.</p>
+                </div>
+                <button 
+                    onClick={handleCreateCharacter}
+                    className="bg-indigo-600 text-white px-4 py-2 text-sm rounded hover:bg-indigo-700 transition-colors font-bold flex items-center gap-2"
+                >
+                    <span>+</span> Create Character
+                </button>
+            </div>
+
+            {loadingCharacters ? (
+                <div className="flex justify-center py-8">
+                    <span className="text-gray-400 animate-pulse">Loading characters...</span>
+                </div>
+            ) : characters.length === 0 ? (
+                <div className="text-center py-10 border-2 border-dashed border-gray-300 rounded-lg">
+                    <p className="text-gray-500 mb-2">You haven't created any character yet.</p>
+                    <button onClick={handleCreateCharacter} className="text-indigo-600 font-semibold hover:underline">Create your first character</button>
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {characters.map(character => (
+                        <div key={character.id} className="bg-white rounded-lg shadow overflow-hidden border hover:border-indigo-300 transition-all group">
+                             <div className="h-40 bg-gray-200 relative">
+                                {character.image_url ? (
+                                    <img 
+                                        src={character.image_url} 
+                                        alt={character.name} 
+                                        className="w-full h-full object-cover"
+                                    />
+                                ) : (
+                                    <div className="w-full h-full flex items-center justify-center text-gray-400 bg-gray-100">
+                                        <span className="text-4xl">👤</span>
+                                    </div>
+                                )}
+                            </div>
+                            <div className="p-4">
+                                <h4 className="font-bold text-lg mb-1 truncate">{character.name}</h4>
+                                <div className="flex gap-2 mb-3">
+                                    <span className="text-xs bg-gray-100 px-2 py-0.5 rounded text-gray-600">Level 1</span>
+                                    <span className="text-xs bg-gray-100 px-2 py-0.5 rounded text-gray-600">Warrior</span>
+                                </div>
+                                <button 
+                                    className="w-full bg-indigo-50 text-indigo-600 border border-indigo-200 text-sm py-2 rounded hover:bg-indigo-600 hover:text-white transition-colors font-medium"
+                                    onClick={() => navigate(`/character/${character.id}`)}
+                                >
+                                    Play Character
+                                </button>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
       </div>
     </div>
   );
@@ -231,6 +310,16 @@ function App() {
         />
 
         <Route 
+          path="/campaigns" 
+          element={
+            <>
+              <SignedOut><RedirectToSignIn /></SignedOut>
+              <SignedIn><CampaignsDashboard /></SignedIn>
+            </>
+          } 
+        />
+
+        <Route 
           path="/create-universe" 
           element={
             <>
@@ -276,6 +365,16 @@ function App() {
             <>
               <SignedOut><RedirectToSignIn /></SignedOut>
               <SignedIn><SheetManager mode="edit" /></SignedIn>
+            </>
+          } 
+        />
+
+        <Route 
+          path="/characters/create" 
+          element={
+            <>
+              <SignedOut><RedirectToSignIn /></SignedOut>
+              <SignedIn><CreateCharacter /></SignedIn>
             </>
           } 
         />

@@ -25,7 +25,28 @@ def create_universe(universe: schemas.UniverseCreate, db: Session = Depends(data
 @router.get("/universes/", response_model=List[schemas.Universe])
 def read_universes(db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
     # Return universes created by the current user (where they are the GM/Creator)
-    return db.query(models.Universe).filter(models.Universe.gm_id == current_user.id).all()
+    print(f"DEBUG: Fetching universes for user: {current_user.id}")
+    universes = db.query(models.Universe).filter(models.Universe.gm_id == current_user.id).all()
+    print(f"DEBUG: Found {len(universes)} universes")
+    
+    if len(universes) == 0:
+        # Debug: Check if there are ANY universes
+        count = db.query(models.Universe).count()
+        print(f"DEBUG: Total universes in DB: {count}")
+        if count > 0:
+            sample = db.query(models.Universe).first()
+            print(f"DEBUG: Sample universe GM_ID: {sample.gm_id}")
+            print(f"DEBUG: Mismatch? Current: {current_user.id} vs Sample: {sample.gm_id}")
+
+    return universes
+
+@router.get("/universes/available", response_model=List[schemas.Universe])
+def read_available_universes(db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
+    # Return public universes OR universes owned by user
+    # Note: In SQLAlchemy OR, use | for OR operator
+    return db.query(models.Universe).filter(
+        (models.Universe.isPublic == True) | (models.Universe.gm_id == current_user.id)
+    ).all()
 
 @router.get("/universes/{universe_id}", response_model=schemas.Universe)
 def read_universe(universe_id: int, db: Session = Depends(database.get_db)):
@@ -51,6 +72,23 @@ def update_universe(universe_id: int, universe_update: schemas.UniverseUpdate, d
     db.commit()
     db.refresh(db_universe)
     return db_universe
+
+@router.delete("/universes/{universe_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_universe(universe_id: int, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
+    db_universe = db.query(models.Universe).filter(models.Universe.id == universe_id).first()
+    if not db_universe:
+        raise HTTPException(status_code=404, detail="Universe not found")
+    
+    if db_universe.gm_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to delete this universe")
+
+    # Optional: Delete related assets, characters, campaigns manually if cascade is not set up
+    # Assuming cascade delete is configured in DB or SQLAlchemy models for simplicity, 
+    # but strictly speaking we should clean up if needed.
+    
+    db.delete(db_universe)
+    db.commit()
+    return None
 
 # --- Assets ---
 

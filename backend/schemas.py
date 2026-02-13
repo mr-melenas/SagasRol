@@ -30,15 +30,22 @@ class User(UserBase):
 
 class CampaignBase(BaseModel):
     name: str
+    description: Optional[str] = None
+    universe_id: int
 
 class CampaignCreate(CampaignBase):
     pass
 
 class Campaign(CampaignBase):
     id: int
-    gm_id: str # Changed from int to str
+    gm_id: str 
+    inviteCode: str
     class Config:
         orm_mode = True
+
+class CampaignJoin(BaseModel):
+    inviteCode: str
+    characterId: int
 
 class CharacterBase(BaseModel):
     name: str
@@ -46,12 +53,19 @@ class CharacterBase(BaseModel):
     image_url: Optional[str] = None
 
 class CharacterCreate(CharacterBase):
-    campaign_id: int
+    campaign_id: Optional[int] = None
+    universe_id: int
+
+class CharacterUpdate(BaseModel):
+    name: Optional[str] = None
+    stats: Optional[Dict[str, Any]] = None
+    image_url: Optional[str] = None
 
 class Character(CharacterBase):
     id: int
     user_id: str # Changed from int to str
-    campaign_id: int
+    campaign_id: Optional[int] = None
+    universe_id: Optional[int] = None
     class Config:
         orm_mode = True
 
@@ -109,7 +123,7 @@ class UniverseUpdate(BaseModel):
 
 class CharacterSheetTemplateBase(BaseModel):
     name: str
-    structure: List[Dict[str, Any]] # JSON structure
+    structure: Any # JSON structure, can be List[Dict] (old) or Dict (new with tabs)
     
 class CharacterSheetTemplateCreate(CharacterSheetTemplateBase):
     pass
