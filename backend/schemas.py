@@ -30,15 +30,22 @@ class User(UserBase):
 
 class CampaignBase(BaseModel):
     name: str
+    description: Optional[str] = None
+    universe_id: int
 
 class CampaignCreate(CampaignBase):
     pass
 
 class Campaign(CampaignBase):
     id: int
-    gm_id: str # Changed from int to str
+    gm_id: str 
+    inviteCode: str
     class Config:
         orm_mode = True
+
+class CampaignJoin(BaseModel):
+    inviteCode: str
+    characterId: int
 
 class CharacterBase(BaseModel):
     name: str

@@ -18,7 +18,7 @@ if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
 
 from backend import models, database, schemas, auth
-from backend.routers import universes, sheets
+from backend.routers import universes, sheets, campaigns
 
 models.Base.metadata.create_all(bind=database.engine)
 
@@ -50,6 +50,7 @@ socket_app = socketio.ASGIApp(sio, app)
 # Include Routers
 app.include_router(universes.router, tags=["universes"])
 app.include_router(sheets.router, tags=["sheets"])
+app.include_router(campaigns.router, tags=["campaigns"])
 
 @app.get("/")
 def read_root():
@@ -62,20 +63,20 @@ async def read_users_me(current_user: models.User = Depends(auth.get_current_use
 # ... (Rest of endpoints using Depends(auth.get_current_user) will now use Clerk)
 
 # Campaign Endpoints
-@app.post("/campaigns/", response_model=schemas.Campaign)
-def create_campaign(campaign: schemas.CampaignCreate, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
-    # Role logic removed
-    # if current_user.role != models.UserRole.GM:
-    #    raise HTTPException(status_code=403, detail="Only GMs can create campaigns")
-    db_campaign = models.Campaign(name=campaign.name, gm_id=current_user.id)
-    db.add(db_campaign)
-    db.commit()
-    db.refresh(db_campaign)
-    return db_campaign
-
-@app.get("/campaigns/", response_model=List[schemas.Campaign])
-def read_campaigns(db: Session = Depends(database.get_db)):
-    return db.query(models.Campaign).all()
+# @app.post("/campaigns/", response_model=schemas.Campaign)
+# def create_campaign(campaign: schemas.CampaignCreate, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
+#    # Role logic removed
+#    # if current_user.role != models.UserRole.GM:
+#    #    raise HTTPException(status_code=403, detail="Only GMs can create campaigns")
+#    db_campaign = models.Campaign(name=campaign.name, gm_id=current_user.id)
+#    db.add(db_campaign)
+#    db.commit()
+#    db.refresh(db_campaign)
+#    return db_campaign
+#
+# @app.get("/campaigns/", response_model=List[schemas.Campaign])
+# def read_campaigns(db: Session = Depends(database.get_db)):
+#    return db.query(models.Campaign).all()
 
 # Character Endpoints
 @app.post("/characters/", response_model=schemas.Character)

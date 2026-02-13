@@ -5,6 +5,7 @@ import { CreateUniverse } from './pages/CreateUniverse';
 import { UniverseSettings } from './pages/UniverseSettings';
 import { SheetManager } from './pages/SheetManager';
 import { CreateCharacter } from './pages/characters/CreateCharacter';
+import { CampaignsDashboard } from './pages/campaigns';
 import { TestPlayerMode } from './pages/TestPlayerMode';
 import { 
   SignedIn, 
@@ -81,13 +82,11 @@ function Dashboard() {
   }, [user, getToken]);
   
   const handleCreateCampaign = () => {
-    // Logic to open create campaign modal or navigate to create campaign page
-    console.log("Create campaign clicked");
+    navigate('/campaigns');
   };
 
   const handleJoinCampaign = () => {
-    // Logic to open join campaign modal
-    console.log("Join campaign clicked");
+    navigate('/campaigns');
   };
 
   const handleCreateUniverse = () => {
@@ -306,6 +305,16 @@ function App() {
             <>
               <SignedOut><RedirectToSignIn /></SignedOut>
               <SignedIn><Dashboard /></SignedIn>
+            </>
+          } 
+        />
+
+        <Route 
+          path="/campaigns" 
+          element={
+            <>
+              <SignedOut><RedirectToSignIn /></SignedOut>
+              <SignedIn><CampaignsDashboard /></SignedIn>
             </>
           } 
         />
