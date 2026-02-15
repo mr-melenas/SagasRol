@@ -3,7 +3,7 @@ import axios from 'axios';
 import { useAuth } from '@clerk/clerk-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Plus, Copy, ArrowRight, User as UserIcon, Shield } from 'lucide-react';
-import { useUniverseStore } from '../../stores/useUniverseStore';
+// import { useUniverseStore } from '../../stores/useUniverseStore';
 
 interface Campaign {
     id: number;
@@ -59,15 +59,18 @@ export const CampaignsDashboard: React.FC = () => {
             setCampaigns(campRes.data);
 
             // Fetch Universes (for creating campaign)
-            const univRes = await axios.get('http://localhost:8000/universes/', { headers });
+            const univRes = await axios.get('http://localhost:8000/universes/available', { headers });
             setUniverses(univRes.data);
 
             // Fetch My Characters (for joining campaign)
             const charRes = await axios.get('http://localhost:8000/my-characters/', { headers });
             setMyCharacters(charRes.data);
 
-        } catch (error) {
+        } catch (error: any) {
             console.error("Error fetching data", error);
+            if (error.code === 'ERR_NETWORK') {
+                alert("Cannot connect to server. Please check if backend is running.");
+            }
         } finally {
             setLoading(false);
         }

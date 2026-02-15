@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Optional, Any, Dict
 import enum
 try:
@@ -31,17 +31,18 @@ class User(UserBase):
 class CampaignBase(BaseModel):
     name: str
     description: Optional[str] = None
-    universe_id: int
+    universe_id: Optional[int] = None
 
 class CampaignCreate(CampaignBase):
-    pass
+    universe_id: int # Required for creation
 
 class Campaign(CampaignBase):
     id: int
     gm_id: str 
-    inviteCode: str
+    invite_code: str = Field(..., serialization_alias="inviteCode")
     class Config:
         orm_mode = True
+        allow_population_by_field_name = True
 
 class CampaignJoin(BaseModel):
     inviteCode: str

@@ -17,7 +17,7 @@ def create_campaign(
 ):
     # Generate unique invite code
     invite_code = nanoid.generate(size=6)
-    while db.query(models.Campaign).filter(models.Campaign.inviteCode == invite_code).first():
+    while db.query(models.Campaign).filter(models.Campaign.invite_code == invite_code).first():
         invite_code = nanoid.generate(size=6)
 
     new_campaign = models.Campaign(
@@ -25,7 +25,7 @@ def create_campaign(
         description=campaign.description,
         universe_id=campaign.universe_id,
         gm_id=current_user.id,
-        inviteCode=invite_code
+        invite_code=invite_code
     )
     db.add(new_campaign)
     db.commit()
@@ -59,7 +59,7 @@ def join_campaign(
     current_user: models.User = Depends(get_current_user)
 ):
     # 1. Find Campaign
-    campaign = db.query(models.Campaign).filter(models.Campaign.inviteCode == join_data.inviteCode).first()
+    campaign = db.query(models.Campaign).filter(models.Campaign.invite_code == join_data.inviteCode).first()
     if not campaign:
         raise HTTPException(status_code=404, detail="Campaign not found")
 

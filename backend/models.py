@@ -88,12 +88,12 @@ class Campaign(Base):
     __tablename__ = "campaigns"
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, index=True)
-    description = Column(String, nullable=True) # Added description
-    inviteCode = Column(String, unique=True, index=True) # Added inviteCode
-    gm_id = Column(String, ForeignKey("users.id")) 
-    universe_id = Column(Integer, ForeignKey("universes.id"), nullable=True) 
-    created_at = Column(DateTime, default=datetime.datetime.utcnow) # Added createdAt
-    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow) # Added updatedAt
+    description = Column(String, nullable=True)
+    invite_code = Column("inviteCode", String, unique=True, index=True)
+    gm_id = Column(String, ForeignKey("users.id"))
+    universe_id = Column(Integer, ForeignKey("universes.id"), nullable=True)
+    created_at = Column("createdAt", DateTime, default=datetime.datetime.utcnow)
+    updated_at = Column("updatedAt", DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
 
     gm = relationship("User", back_populates="campaigns")
     universe = relationship("Universe", back_populates="campaigns")

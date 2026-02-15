@@ -28,25 +28,16 @@ def read_universes(db: Session = Depends(database.get_db), current_user: models.
     print(f"DEBUG: Fetching universes for user: {current_user.id}")
     universes = db.query(models.Universe).filter(models.Universe.gm_id == current_user.id).all()
     print(f"DEBUG: Found {len(universes)} universes")
-    
-    if len(universes) == 0:
-        # Debug: Check if there are ANY universes
-        count = db.query(models.Universe).count()
-        print(f"DEBUG: Total universes in DB: {count}")
-        if count > 0:
-            sample = db.query(models.Universe).first()
-            print(f"DEBUG: Sample universe GM_ID: {sample.gm_id}")
-            print(f"DEBUG: Mismatch? Current: {current_user.id} vs Sample: {sample.gm_id}")
-
     return universes
 
 @router.get("/universes/available", response_model=List[schemas.Universe])
 def read_available_universes(db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
     # Return public universes OR universes owned by user
     # Note: In SQLAlchemy OR, use | for OR operator
-    return db.query(models.Universe).filter(
+    universes = db.query(models.Universe).filter(
         (models.Universe.isPublic == True) | (models.Universe.gm_id == current_user.id)
     ).all()
+    return universes
 
 @router.get("/universes/{universe_id}", response_model=schemas.Universe)
 def read_universe(universe_id: int, db: Session = Depends(database.get_db)):

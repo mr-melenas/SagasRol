@@ -172,7 +172,9 @@ function Dashboard() {
                                     </div>
                                 )}
                                 <div className="absolute top-2 right-2">
-                                    <span className="bg-black/50 text-white text-xs px-2 py-1 rounded backdrop-blur-sm">Private</span>
+                                    <span className={`text-xs px-2 py-1 rounded backdrop-blur-sm text-white ${universe.isPublic ? 'bg-green-600/50' : 'bg-black/50'}`}>
+                                        {universe.isPublic ? 'Public' : 'Private'}
+                                    </span>
                                 </div>
                             </div>
                             <div className="p-4">
