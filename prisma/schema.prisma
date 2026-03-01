@@ -48,6 +48,8 @@ model User {
   gm_campaigns   Campaign[]  @relation("GMCampaigns")
   characters     Character[] @relation("PlayerCharacters")
   universes      Universe[]  @relation("GMUniverses")
+  campaign_memberships CampaignMember[]
+  notes_authored CampaignNote[]
 
   @@map("users")
 }
@@ -117,8 +119,55 @@ model Campaign {
   characters  Character[]
   items       Item[]
   sessions    Session[]
+  members     CampaignMember[]
+  notes       CampaignNote[]
+  handouts    Handout[]
+  nextSessionAt DateTime?
 
   @@map("campaigns")
+}
+
+model CampaignMember {
+  id         Int      @id @default(autoincrement())
+  campaignId Int
+  userId     String
+  role       String   @default("PLAYER") // "GM" o "PLAYER"
+  joinedAt   DateTime @default(now())
+
+  campaign   Campaign @relation(fields: [campaignId], references: [id])
+  user       User     @relation(fields: [userId], references: [id])
+
+  // Un usuario solo puede unirse una vez a la misma campaña
+  @@unique([campaignId, userId])
+  @@map("campaign_members")
+}
+
+model CampaignNote {
+  id         Int      @id @default(autoincrement())
+  campaignId Int
+  authorId   String
+  content    String   // Aquí guardaremos el texto enriquecido (HTML o Markdown)
+  isPrivate  Boolean  @default(true) // Si es true, solo lo ve el autor
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  campaign   Campaign @relation(fields: [campaignId], references: [id])
+  author     User     @relation(fields: [authorId], references: [id])
+
+  @@map("campaign_notes")
+}
+
+model Handout {
+  id         Int      @id @default(autoincrement())
+  campaignId Int
+  name       String
+  content    String
+  isVisible  Boolean  @default(false) // El GM decide cuándo revelarlo a los jugadores
+  createdAt  DateTime @default(now())
+
+  campaign   Campaign @relation(fields: [campaignId], references: [id])
+
+  @@map("handouts")
 }
 
 model Character {

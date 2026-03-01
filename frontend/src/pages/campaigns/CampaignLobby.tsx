@@ -1,0 +1,309 @@
+import React, { useEffect, useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { useAuth, useUser } from '@clerk/clerk-react';
+import axios from 'axios';
+import { 
+  Info, 
+  Users, 
+  ScrollText, 
+  BookOpen, 
+  Shield, 
+  Swords, 
+  Calendar, 
+  Copy, 
+  PlusCircle, 
+  User as UserIcon 
+} from 'lucide-react';
+import { LobbyData } from '../../types';
+
+type TabType = 'general' | 'party' | 'notes' | 'library';
+
+export function CampaignLobby() {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const { getToken } = useAuth();
+  const { user } = useUser();
+  
+  const [lobbyData, setLobbyData] = useState<LobbyData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<TabType>('general');
+
+  useEffect(() => {
+    const fetchLobby = async () => {
+      try {
+        const token = await getToken();
+        const response = await axios.get(`http://localhost:8000/campaigns/${id}/lobby`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setLobbyData(response.data);
+      } catch (err: any) {
+        console.error("Error fetching lobby:", err);
+        setError(err.response?.data?.detail || "Failed to load campaign lobby.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (id) {
+      fetchLobby();
+    }
+  }, [id, getToken]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center text-white">
+        <div className="animate-pulse flex flex-col items-center">
+          <div className="h-12 w-12 bg-gray-700 rounded-full mb-4"></div>
+          <p>Summoning the lobby...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !lobbyData) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center text-white">
+        <div className="text-center p-8 bg-gray-800 rounded-lg border border-red-800">
+          <h2 className="text-2xl font-bold text-red-500 mb-2">Critical Failure</h2>
+          <p className="text-gray-300">{error || "Campaign not found"}</p>
+          <button 
+            onClick={() => navigate('/dashboard')}
+            className="mt-4 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm transition-colors"
+          >
+            Return to Dashboard
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const { campaign, is_gm, party } = lobbyData;
+  const currentUserMember = party.find(m => m.user_id === user?.id);
+  const hasCharacter = !!currentUserMember?.character;
+
+  const copyInviteCode = () => {
+    if (campaign.invite_code) {
+      navigator.clipboard.writeText(campaign.invite_code);
+      // Optional: Add toast notification here
+    }
+  };
+
+  const renderTabContent = () => {
+    switch (activeTab) {
+      case 'general':
+        return (
+          <div className="space-y-6 animate-in fade-in duration-300">
+            {/* Description Card */}
+            <div className="bg-gray-800 rounded-xl p-6 border border-gray-700 shadow-lg">
+              <h3 className="text-xl font-bold text-indigo-400 mb-4 flex items-center gap-2">
+                <Info size={20} /> About the Campaign
+              </h3>
+              <p className="text-gray-300 leading-relaxed whitespace-pre-wrap">
+                {campaign.description || "No description provided for this adventure."}
+              </p>
+            </div>
+
+            {/* GM Only: Invite Code */}
+            {is_gm && campaign.invite_code && (
+              <div className="bg-gray-800 rounded-xl p-6 border border-indigo-900/50 shadow-lg relative overflow-hidden group">
+                <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                  <Shield size={100} />
+                </div>
+                <h3 className="text-lg font-bold text-white mb-2">Invite Adventurers</h3>
+                <p className="text-gray-400 text-sm mb-4">Share this code with your players to let them join the lobby.</p>
+                
+                <div className="flex items-center gap-2 bg-black/30 p-3 rounded-lg border border-gray-700 max-w-md">
+                  <code className="flex-1 font-mono text-xl text-yellow-400 tracking-wider text-center">
+                    {campaign.invite_code}
+                  </code>
+                  <button 
+                    onClick={copyInviteCode}
+                    className="p-2 hover:bg-gray-700 rounded text-gray-400 hover:text-white transition-colors"
+                    title="Copy Code"
+                  >
+                    <Copy size={18} />
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+
+      case 'party':
+        return (
+          <div className="space-y-6 animate-in fade-in duration-300">
+            {/* CTA for Players without Character */}
+            {!is_gm && !hasCharacter && (
+              <div className="bg-gradient-to-r from-indigo-900 to-purple-900 rounded-xl p-8 border border-indigo-500 shadow-2xl text-center relative overflow-hidden">
+                <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-20"></div>
+                <div className="relative z-10">
+                  <h2 className="text-2xl font-bold text-white mb-2">Your Hero is Missing!</h2>
+                  <p className="text-indigo-200 mb-6 max-w-lg mx-auto">
+                    You have joined the lobby, but you haven't assigned a character to this campaign yet. 
+                    Create one now to prepare for the adventure.
+                  </p>
+                  <button 
+                    onClick={() => navigate(`/characters/create?campaign_id=${campaign.id}`)}
+                    className="bg-white text-indigo-900 px-6 py-3 rounded-lg font-bold hover:bg-indigo-50 transition-colors shadow-lg flex items-center gap-2 mx-auto"
+                  >
+                    <PlusCircle size={20} /> Create Character
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {party.map((member) => (
+                <div 
+                  key={member.user_id} 
+                  className={`bg-gray-800 rounded-xl overflow-hidden border transition-all hover:shadow-xl ${
+                    member.role === 'GM' ? 'border-yellow-600/50' : 'border-gray-700 hover:border-gray-500'
+                  }`}
+                >
+                  {/* Member Header */}
+                  <div className={`p-4 flex justify-between items-center ${
+                    member.role === 'GM' ? 'bg-yellow-900/20' : 'bg-gray-900/50'
+                  }`}>
+                    <div className="flex items-center gap-3">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${
+                        member.role === 'GM' ? 'bg-yellow-600 text-black' : 'bg-gray-600 text-white'
+                      }`}>
+                        {member.role === 'GM' ? 'GM' : 'PC'}
+                      </div>
+                      <div>
+                        <p className="font-semibold text-gray-200">{member.username}</p>
+                        <p className="text-xs text-gray-500">Joined {new Date(member.joined_at).toLocaleDateString()}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Character Info */}
+                  <div className="p-4">
+                    {member.character ? (
+                      <div className="flex gap-4">
+                         <div className="w-16 h-16 bg-gray-700 rounded-lg overflow-hidden flex-shrink-0 border border-gray-600">
+                            {member.character.image_url ? (
+                                <img src={member.character.image_url} alt={member.character.name} className="w-full h-full object-cover" />
+                            ) : (
+                                <div className="w-full h-full flex items-center justify-center text-gray-500">
+                                    <UserIcon size={24} />
+                                </div>
+                            )}
+                         </div>
+                         <div>
+                             <h4 className="font-bold text-white text-lg">{member.character.name}</h4>
+                             <button 
+                                onClick={() => navigate(`/character/${member.character!.id}`)}
+                                className="text-indigo-400 text-xs hover:text-indigo-300 mt-1 hover:underline"
+                             >
+                                View Sheet
+                             </button>
+                         </div>
+                      </div>
+                    ) : (
+                      <div className="h-16 flex items-center justify-center text-gray-500 italic text-sm bg-gray-900/30 rounded-lg border border-dashed border-gray-700">
+                        {member.role === 'GM' ? 'Game Master' : 'No Character Created'}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+
+      case 'notes':
+        return (
+            <div className="flex flex-col items-center justify-center h-64 text-gray-500 bg-gray-800/50 rounded-xl border border-gray-700 border-dashed">
+                <ScrollText size={48} className="mb-4 opacity-50" />
+                <h3 className="text-lg font-semibold">Campaign Notes</h3>
+                <p className="text-sm">This module is under construction.</p>
+                <p className="text-xs mt-2">Manage your private journal and shared lore here.</p>
+            </div>
+        );
+
+      case 'library':
+        return (
+            <div className="flex flex-col items-center justify-center h-64 text-gray-500 bg-gray-800/50 rounded-xl border border-gray-700 border-dashed">
+                <BookOpen size={48} className="mb-4 opacity-50" />
+                <h3 className="text-lg font-semibold">Library & Handouts</h3>
+                <p className="text-sm">This module is under construction.</p>
+                <p className="text-xs mt-2">Access maps, documents, and rules here.</p>
+            </div>
+        );
+
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-900 text-gray-100 font-sans selection:bg-indigo-500 selection:text-white">
+      {/* Header Image / Gradient */}
+      <div className="h-48 bg-gradient-to-b from-indigo-900 to-gray-900 relative">
+        <div className="absolute inset-0 bg-black/40"></div>
+        <div className="container mx-auto px-6 h-full flex flex-col justify-end pb-8 relative z-10">
+          <div className="flex justify-between items-end">
+            <div>
+              <div className="flex items-center gap-3 mb-2">
+                <span className={`px-3 py-1 rounded-full text-xs font-bold tracking-wide uppercase ${
+                  is_gm ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/50' : 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/50'
+                }`}>
+                  {is_gm ? 'Game Master' : 'Player'}
+                </span>
+                {campaign.next_session_at && (
+                  <span className="flex items-center gap-1 text-gray-400 text-xs bg-black/50 px-2 py-1 rounded border border-gray-700">
+                    <Calendar size={12} />
+                    Next Session: {new Date(campaign.next_session_at).toLocaleDateString()}
+                  </span>
+                )}
+              </div>
+              <h1 className="text-4xl font-extrabold text-white tracking-tight drop-shadow-lg">{campaign.name}</h1>
+            </div>
+            
+            <button 
+               onClick={() => navigate(`/game/${campaign.id}`)}
+               className="bg-green-600 hover:bg-green-500 text-white px-6 py-3 rounded-lg font-bold shadow-lg shadow-green-900/20 transition-all flex items-center gap-2"
+            >
+               <Swords size={20} /> Enter Game Room
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="container mx-auto px-6 py-8">
+        
+        {/* Tabs Navigation */}
+        <div className="flex gap-2 border-b border-gray-700 mb-8 overflow-x-auto pb-1">
+          {[
+            { id: 'general', label: 'Overview', icon: Info },
+            { id: 'party', label: 'Party', icon: Users },
+            { id: 'notes', label: 'Journal', icon: ScrollText },
+            { id: 'library', label: 'Library', icon: BookOpen },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as TabType)}
+              className={`flex items-center gap-2 px-6 py-3 rounded-t-lg font-medium transition-all ${
+                activeTab === tab.id 
+                  ? 'bg-gray-800 text-indigo-400 border-b-2 border-indigo-500' 
+                  : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/50'
+              }`}
+            >
+              <tab.icon size={18} />
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Tab Content Area */}
+        <div className="min-h-[400px]">
+            {renderTabContent()}
+        </div>
+
+      </div>
+    </div>
+  );
+}

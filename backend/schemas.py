@@ -46,7 +46,48 @@ class Campaign(CampaignBase):
 
 class CampaignJoin(BaseModel):
     inviteCode: str
-    characterId: int
+
+class CampaignMember(BaseModel):
+    user_id: str
+    username: Optional[str]
+    role: str
+    joined_at: Any
+    character: Optional[Dict[str, Any]] = None
+
+class CampaignNoteCreate(BaseModel):
+    content: str
+    is_private: bool = True
+
+class HandoutCreate(BaseModel):
+    name: str
+    content: str
+    is_visible: bool = False
+
+class HandoutUpdate(BaseModel):
+    name: Optional[str] = None
+    content: Optional[str] = None
+    is_visible: Optional[bool] = None
+
+class CampaignNote(BaseModel):
+    id: int
+    content: str
+    is_private: bool
+    author_id: str
+    created_at: Any
+
+class Handout(BaseModel):
+    id: int
+    name: str
+    content: str
+    is_visible: bool
+    created_at: Any
+
+class LobbyResponse(BaseModel):
+    campaign: Dict[str, Any]
+    is_gm: bool
+    party: List[CampaignMember]
+    notes: List[CampaignNote]
+    handouts: List[Handout]
 
 class CharacterBase(BaseModel):
     name: str

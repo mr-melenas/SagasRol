@@ -12,6 +12,10 @@ export const CreateCharacter: React.FC = () => {
     const { getToken } = useAuth();
     const { characterValues, reset } = useCharacterStore();
     
+    // Get query params
+    const query = new URLSearchParams(window.location.search);
+    const campaignId = query.get('campaign_id');
+    
     const [universes, setUniverses] = useState<Universe[]>([]);
     const [selectedUniverseId, setSelectedUniverseId] = useState<string>('');
     const [selectedUniverse, setSelectedUniverse] = useState<Universe | null>(null);
@@ -23,21 +27,44 @@ export const CreateCharacter: React.FC = () => {
         // Reset store on mount
         reset();
         
-        const fetchUniverses = async () => {
+        const fetchData = async () => {
             try {
                 const token = await getToken();
-                const res = await axios.get('http://localhost:8000/universes/available', {
+                
+                // Fetch Universes
+                const universesRes = await axios.get('http://localhost:8000/universes/available', {
                     headers: { Authorization: `Bearer ${token}` }
                 });
-                setUniverses(res.data);
+                setUniverses(universesRes.data);
+                
+                // If campaign_id is present, fetch campaign to pre-select universe
+                if (campaignId) {
+                    try {
+                        const campaignRes = await axios.get(`http://localhost:8000/campaigns/${campaignId}/lobby`, {
+                             headers: { Authorization: `Bearer ${token}` }
+                        });
+                        const campaign = campaignRes.data.campaign;
+                        if (campaign.universe_id) {
+                            setSelectedUniverseId(campaign.universe_id.toString());
+                            // We need to find the universe object, but universes state might not be set yet.
+                            // So we set it in the next effect or here if we wait.
+                            const universe = universesRes.data.find((u: Universe) => u.id === campaign.universe_id);
+                            if (universe) {
+                                setSelectedUniverse(universe);
+                            }
+                        }
+                    } catch (campErr) {
+                        console.error("Failed to fetch campaign details", campErr);
+                    }
+                }
             } catch (err) {
-                console.error("Failed to fetch universes", err);
+                console.error("Failed to fetch data", err);
             } finally {
                 setLoading(false);
             }
         };
-        fetchUniverses();
-    }, [getToken, reset]);
+        fetchData();
+    }, [getToken, reset, campaignId]);
 
     const handleUniverseChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         const universeId = e.target.value;
@@ -63,16 +90,26 @@ export const CreateCharacter: React.FC = () => {
         setSaving(true);
         try {
             const token = await getToken();
-            await axios.post('http://localhost:8000/characters/', {
+            const payload: any = {
                 name: characterName,
                 universe_id: parseInt(selectedUniverseId),
                 stats: characterValues // Mapping 'values' to 'stats' as per backend schema
-            }, {
+            };
+            
+            if (campaignId) {
+                payload.campaign_id = parseInt(campaignId);
+            }
+
+            await axios.post('http://localhost:8000/characters/', payload, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             
             // Redirect to dashboard or character sheet
-            navigate('/dashboard');
+            if (campaignId) {
+                navigate(`/campaigns/${campaignId}/lobby`);
+            } else {
+                navigate('/dashboard');
+            }
         } catch (err) {
             console.error("Failed to create character", err);
             alert("Failed to create character");

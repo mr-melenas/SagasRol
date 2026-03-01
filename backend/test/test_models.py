@@ -46,3 +46,87 @@ def test_create_campaign_model(db_session: Session):
     retrieved = db_session.query(models.Campaign).filter(models.Campaign.invite_code == "ABC1234").first()
     assert retrieved is not None
     assert retrieved.id == campaign.id
+
+def test_campaign_member_model(db_session: Session):
+    """
+    Prueba Unitaria: Modelo CampaignMember
+    Objetivo: Verificar que la relación N:M entre Usuario y Campaña se crea correctamente
+    con los campos adicionales (rol, joined_at).
+    """
+    # 1. Setup
+    user = models.User(id="user_player", username="player1")
+    gm = models.User(id="user_gm", username="gm1")
+    db_session.add_all([user, gm])
+    db_session.commit()
+    
+    universe = models.Universe(name="U1", gm_id="user_gm")
+    db_session.add(universe)
+    db_session.commit()
+    
+    campaign = models.Campaign(name="C1", gm_id="user_gm", universe_id=universe.id, invite_code="CODE1")
+    db_session.add(campaign)
+    db_session.commit()
+
+    # 2. Create Member
+    member = models.CampaignMember(
+        campaign_id=campaign.id,
+        user_id=user.id,
+        role="PLAYER"
+    )
+    db_session.add(member)
+    db_session.commit()
+
+    # 3. Verify
+    assert member.id is not None
+    assert member.role == "PLAYER"
+    assert member.joined_at is not None
+    
+    # Verify Relationships
+    assert member.user == user
+    assert member.campaign == campaign
+    assert user.campaign_memberships[0] == member
+    assert campaign.members[0] == member
+
+def test_campaign_content_models(db_session: Session):
+    """
+    Prueba Unitaria: Modelos de Contenido (Notes y Handouts)
+    Objetivo: Verificar la creación y relaciones de notas y handouts.
+    """
+    # 1. Setup
+    gm = models.User(id="gm_1", username="GM")
+    db_session.add(gm)
+    db_session.commit()
+    
+    universe = models.Universe(name="U1", gm_id="gm_1")
+    db_session.add(universe)
+    db_session.commit()
+    
+    campaign = models.Campaign(name="C1", gm_id="gm_1", universe_id=universe.id, invite_code="CODE2")
+    db_session.add(campaign)
+    db_session.commit()
+
+    # 2. Create Note
+    note = models.CampaignNote(
+        campaign_id=campaign.id,
+        author_id=gm.id,
+        content="Secret Note",
+        is_private=True
+    )
+    db_session.add(note)
+
+    # 3. Create Handout
+    handout = models.Handout(
+        campaign_id=campaign.id,
+        name="Map",
+        content="Map URL",
+        is_visible=False
+    )
+    db_session.add(handout)
+    db_session.commit()
+
+    # 4. Verify
+    assert note.campaign == campaign
+    assert note.author == gm
+    assert handout.campaign == campaign
+    assert len(campaign.notes) == 1
+    assert len(campaign.handouts) == 1

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuth } from '@clerk/clerk-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Plus, Copy, ArrowRight, User as UserIcon, Shield } from 'lucide-react';
 // import { useUniverseStore } from '../../stores/useUniverseStore';
 
@@ -28,10 +28,10 @@ interface Character {
 export const CampaignsDashboard: React.FC = () => {
     const { getToken, userId } = useAuth();
     const navigate = useNavigate();
+    const location = useLocation();
     const [loading, setLoading] = useState(true);
     const [campaigns, setCampaigns] = useState<CampaignList>({ mastering: [], playing: [] });
     const [universes, setUniverses] = useState<any[]>([]);
-    const [myCharacters, setMyCharacters] = useState<Character[]>([]);
 
     // Create Modal State
     const [showCreateModal, setShowCreateModal] = useState(false);
@@ -42,11 +42,15 @@ export const CampaignsDashboard: React.FC = () => {
     // Join Modal State
     const [showJoinModal, setShowJoinModal] = useState(false);
     const [inviteCode, setInviteCode] = useState('');
-    const [selectedCharacterId, setSelectedCharacterId] = useState<number | ''>('');
 
     useEffect(() => {
         fetchData();
-    }, []);
+        if (location.state && (location.state as any).openCreate) {
+            setShowCreateModal(true);
+            // Optional: Clear state so it doesn't reopen on refresh
+            // navigate(location.pathname, { replace: true, state: {} });
+        }
+    }, [location]);
 
     const fetchData = async () => {
         setLoading(true);
@@ -61,10 +65,6 @@ export const CampaignsDashboard: React.FC = () => {
             // Fetch Universes (for creating campaign)
             const univRes = await axios.get('http://localhost:8000/universes/available', { headers });
             setUniverses(univRes.data);
-
-            // Fetch My Characters (for joining campaign)
-            const charRes = await axios.get('http://localhost:8000/my-characters/', { headers });
-            setMyCharacters(charRes.data);
 
         } catch (error: any) {
             console.error("Error fetching data", error);
@@ -102,21 +102,25 @@ export const CampaignsDashboard: React.FC = () => {
 
     const handleJoinCampaign = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!inviteCode || !selectedCharacterId) return;
+        if (!inviteCode) return;
 
         try {
             const token = await getToken();
-            await axios.post('http://localhost:8000/campaigns/join', {
-                inviteCode,
-                characterId: Number(selectedCharacterId)
+            const response = await axios.post('http://localhost:8000/campaigns/join', {
+                inviteCode
             }, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setShowJoinModal(false);
             setInviteCode('');
-            setSelectedCharacterId('');
-            fetchData();
-            alert("Joined campaign successfully!");
+            
+            // Redirect to the lobby of the newly joined campaign
+            if (response.data.campaign_id) {
+                navigate(`/campaigns/${response.data.campaign_id}/lobby`);
+            } else {
+                fetchData();
+                alert("Joined campaign successfully!");
+            }
         } catch (error: any) {
             console.error("Error joining campaign", error);
             alert(error.response?.data?.detail || "Failed to join campaign");
@@ -180,7 +184,10 @@ export const CampaignsDashboard: React.FC = () => {
                                                 <Copy size={14} />
                                             </button>
                                         </div>
-                                        <button className="text-indigo-600 hover:text-indigo-800 font-medium text-sm flex items-center gap-1">
+                                        <button 
+                                            onClick={() => navigate(`/campaigns/${camp.id}/lobby`)}
+                                            className="text-indigo-600 hover:text-indigo-800 font-medium text-sm flex items-center gap-1"
+                                        >
                                             Manage <ArrowRight size={16} />
                                         </button>
                                     </div>
@@ -212,7 +219,10 @@ export const CampaignsDashboard: React.FC = () => {
                                     <p className="text-sm text-gray-500 mb-4 line-clamp-2">{camp.description || "No description provided."}</p>
                                     
                                     <div className="flex justify-end pt-4 border-t border-gray-100">
-                                        <button className="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 font-medium transition-colors">
+                                        <button 
+                                            onClick={() => navigate(`/campaigns/${camp.id}/lobby`)}
+                                            className="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 font-medium transition-colors"
+                                        >
                                             Enter Campaign
                                         </button>
                                     </div>
@@ -305,30 +315,6 @@ export const CampaignsDashboard: React.FC = () => {
                                 <p className="text-xs text-gray-500 mt-1">Ask your GM for this code.</p>
                             </div>
                             
-                            <div className="mb-6">
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Select Character</label>
-                                <select 
-                                    required
-                                    className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                                    value={selectedCharacterId}
-                                    onChange={e => setSelectedCharacterId(Number(e.target.value))}
-                                >
-                                    <option value="">Choose a character...</option>
-                                    {myCharacters.filter(c => !c.universe_id /* TODO: Filter by universe if we knew it beforehand */).map(char => (
-                                        <option key={char.id} value={char.id}>{char.name}</option>
-                                    ))}
-                                    {/* Fallback to show all for now */}
-                                    {myCharacters.length > 0 && <optgroup label="All Characters">
-                                        {myCharacters.map(char => (
-                                            <option key={char.id} value={char.id}>{char.name}</option>
-                                        ))}
-                                    </optgroup>}
-                                </select>
-                                <p className="text-xs text-gray-500 mt-1">
-                                    Note: Character must belong to the same Universe as the campaign.
-                                </p>
-                            </div>
-
                             <div className="flex justify-end gap-3">
                                 <button 
                                     type="button"

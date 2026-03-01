@@ -79,6 +79,64 @@ export interface Asset {
     universe_id: number;
 }
 
+export interface CampaignMember {
+    user_id: string;
+    username: string;
+    role: string;
+    joined_at: string;
+    character?: {
+        id: number;
+        name: string;
+        image_url?: string;
+    };
+}
+
+export interface CampaignNote {
+    id: number;
+    content: string;
+    is_private: boolean;
+    author_id: string;
+    created_at: string;
+}
+
+export interface Handout {
+    id: number;
+    name: string;
+    content: string;
+    is_visible: boolean;
+    created_at: string;
+}
+
+export interface Campaign {
+    id: number;
+    name: string;
+    description?: string;
+    invite_code?: string; // Only if GM
+    universe_id: number;
+    gm_id: string;
+    next_session_at?: string;
+    created_at?: string;
+}
+
+export interface CampaignList {
+    mastering: Campaign[];
+    playing: Campaign[];
+}
+
+export interface LobbyData {
+    campaign: {
+        id: number;
+        name: string;
+        description: string;
+        invite_code?: string;
+        next_session_at?: string;
+    };
+    is_gm: boolean;
+    party: CampaignMember[];
+    notes: CampaignNote[];
+    handouts: Handout[];
+}
+
 export interface SheetTab {
   id: string;
   name: string;

@@ -6,7 +6,8 @@ import { UniverseSettings } from './pages/UniverseSettings';
 import { SheetManager } from './pages/SheetManager';
 import { CreateCharacter } from './pages/characters/CreateCharacter';
 import { CampaignsDashboard } from './pages/campaigns';
-import { TestPlayerMode } from './pages/TestPlayerMode';
+import { CampaignLobby } from './pages/campaigns/CampaignLobby';
+import { ActiveCampaignsCard } from './components/dashboard/ActiveCampaignsCard';
 import { 
   SignedIn, 
   SignedOut, 
@@ -81,14 +82,6 @@ function Dashboard() {
       if (user) fetchData();
   }, [user, getToken]);
   
-  const handleCreateCampaign = () => {
-    navigate('/campaigns');
-  };
-
-  const handleJoinCampaign = () => {
-    navigate('/campaigns');
-  };
-
   const handleCreateUniverse = () => {
     navigate('/create-universe');
   };
@@ -110,26 +103,7 @@ function Dashboard() {
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Campaigns Column */}
-        <div className="border p-4 rounded hover:shadow flex flex-col gap-4 bg-white">
-          <div>
-              <h3 className="font-bold text-lg mb-2">Active Campaigns</h3>
-              <p className="text-gray-600 text-sm">Join or continue your adventures.</p>
-          </div>
-          <div className="flex gap-2 mt-auto">
-            <button 
-                onClick={handleCreateCampaign}
-                className="bg-green-600 text-white px-3 py-2 text-sm rounded hover:bg-green-700 transition-colors flex-1 font-semibold"
-            >
-                Create Campaign
-            </button>
-            <button 
-                onClick={handleJoinCampaign}
-                className="bg-blue-600 text-white px-3 py-2 text-sm rounded hover:bg-blue-700 transition-colors flex-1 font-semibold"
-            >
-                Join Campaign
-            </button>
-          </div>
-        </div>
+        <ActiveCampaignsCard />
 
         {/* Universes Column (Spans 2 columns on large screens) */}
         <div className="lg:col-span-2 border p-6 rounded bg-gray-50">
@@ -322,7 +296,17 @@ function App() {
         />
 
         <Route 
-          path="/create-universe" 
+          path="/campaigns/:id/lobby" 
+          element={
+            <>
+              <SignedOut><RedirectToSignIn /></SignedOut>
+              <SignedIn><CampaignLobby /></SignedIn>
+            </>
+          } 
+        />
+
+        <Route 
+          path="/create-universe"  
           element={
             <>
               <SignedOut><RedirectToSignIn /></SignedOut>

@@ -40,6 +40,7 @@ class User(Base):
     campaigns = relationship("Campaign", back_populates="gm")
     characters = relationship("Character", back_populates="player")
     universes = relationship("Universe", back_populates="gm")
+    campaign_memberships = relationship("CampaignMember", back_populates="user")
 
 class Universe(Base):
     __tablename__ = "universes"
@@ -94,12 +95,16 @@ class Campaign(Base):
     universe_id = Column(Integer, ForeignKey("universes.id"), nullable=True)
     created_at = Column("createdAt", DateTime, default=datetime.datetime.utcnow)
     updated_at = Column("updatedAt", DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    next_session_at = Column("nextSessionAt", DateTime, nullable=True)
 
     gm = relationship("User", back_populates="campaigns")
     universe = relationship("Universe", back_populates="campaigns")
     characters = relationship("Character", back_populates="campaign")
     items = relationship("Item", back_populates="campaign")
     sessions = relationship("Session", back_populates="campaign")
+    members = relationship("CampaignMember", back_populates="campaign")
+    notes = relationship("CampaignNote", back_populates="campaign")
+    handouts = relationship("Handout", back_populates="campaign")
 
 class Character(Base):
     __tablename__ = "characters"
@@ -160,3 +165,41 @@ class DowntimeAction(Base):
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     character = relationship("Character", back_populates="downtime_actions")
+
+class CampaignMember(Base):
+    __tablename__ = "campaign_members"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    campaign_id = Column("campaignId", Integer, ForeignKey("campaigns.id"))
+    user_id = Column("userId", String, ForeignKey("users.id"))
+    role = Column(String, default="PLAYER")
+    joined_at = Column("joinedAt", DateTime, default=datetime.datetime.utcnow)
+
+    campaign = relationship("Campaign", back_populates="members")
+    user = relationship("User", back_populates="campaign_memberships")
+
+class CampaignNote(Base):
+    __tablename__ = "campaign_notes"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    campaign_id = Column("campaignId", Integer, ForeignKey("campaigns.id"))
+    author_id = Column("authorId", String, ForeignKey("users.id"))
+    content = Column(Text)
+    is_private = Column("isPrivate", Boolean, default=True)
+    created_at = Column("createdAt", DateTime, default=datetime.datetime.utcnow)
+    updated_at = Column("updatedAt", DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+
+    campaign = relationship("Campaign", back_populates="notes")
+    author = relationship("User")
+
+class Handout(Base):
+    __tablename__ = "handouts"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    campaign_id = Column("campaignId", Integer, ForeignKey("campaigns.id"))
+    name = Column(String)
+    content = Column(Text)
+    is_visible = Column("isVisible", Boolean, default=False)
+    created_at = Column("createdAt", DateTime, default=datetime.datetime.utcnow)
+
+    campaign = relationship("Campaign", back_populates="handouts")
