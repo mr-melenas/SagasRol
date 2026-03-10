@@ -32,9 +32,14 @@ class CampaignBase(BaseModel):
     name: str
     description: Optional[str] = None
     universe_id: Optional[int] = None
+    banner_url: Optional[str] = None # New field
 
 class CampaignCreate(CampaignBase):
     universe_id: int # Required for creation
+
+class CampaignUpdate(BaseModel):
+    description: Optional[str] = None
+    banner_url: Optional[str] = None
 
 class Campaign(CampaignBase):
     id: int
@@ -193,9 +198,14 @@ class AssetBase(BaseModel):
     name: str
     image_url: str
     type: AssetType
+    tags: Optional[List[str]] = []
 
 class AssetCreate(AssetBase):
     universe_id: int
+
+class AssetUpdate(BaseModel):
+    name: Optional[str] = None
+    tags: Optional[List[str]] = None
 
 class Asset(AssetBase):
     id: int

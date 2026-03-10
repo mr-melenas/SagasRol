@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from typing import List, Dict, Optional
 import nanoid
@@ -7,6 +7,7 @@ import datetime
 from backend.database import get_db
 from backend.auth import get_current_user
 from backend import models, schemas
+from backend.utils.storage import upload_image_to_supabase
 
 router = APIRouter(prefix="/campaigns", tags=["campaigns"])
 
@@ -24,6 +25,7 @@ def create_campaign(
     new_campaign = models.Campaign(
         name=campaign.name,
         description=campaign.description,
+        banner_url=campaign.banner_url,
         universe_id=campaign.universe_id,
         gm_id=current_user.id,
         invite_code=invite_code
@@ -98,6 +100,68 @@ def join_campaign(
     
     return {"message": "Joined campaign successfully", "campaign_id": campaign.id}
 
+@router.patch("/{campaign_id}", response_model=schemas.Campaign)
+def update_campaign(
+    campaign_id: int,
+    campaign_update: schemas.CampaignUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    campaign = db.query(models.Campaign).filter(models.Campaign.id == campaign_id).first()
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+    
+    if campaign.gm_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Only GM can update campaign")
+
+    if campaign_update.description is not None:
+        campaign.description = campaign_update.description
+    if campaign_update.banner_url is not None:
+        campaign.banner_url = campaign_update.banner_url
+
+    db.commit()
+    db.refresh(campaign)
+    return campaign
+
+@router.post("/{campaign_id}/banner", response_model=schemas.Campaign)
+async def upload_campaign_banner(
+    campaign_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    campaign = db.query(models.Campaign).filter(models.Campaign.id == campaign_id).first()
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+    
+    if campaign.gm_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Only GM can upload banner")
+
+    # Validate file type
+    if not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="File must be an image")
+
+    try:
+        folder_path = f"campaigns/{campaign_id}/banner"
+        # Using existing utility
+        public_url = await upload_image_to_supabase(file, folder_path)
+        
+        # Ensure we get a string URL
+        if not isinstance(public_url, str):
+             if hasattr(public_url, 'publicUrl'):
+                  public_url = public_url.publicUrl
+             elif isinstance(public_url, dict) and 'publicUrl' in public_url:
+                  public_url = public_url['publicUrl']
+             else:
+                  public_url = str(public_url)
+
+        campaign.banner_url = public_url
+        db.commit()
+        db.refresh(campaign)
+        return campaign
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Banner upload failed: {str(e)}")
+
 @router.get("/{campaign_id}/lobby", response_model=schemas.LobbyResponse)
 def get_campaign_lobby(
     campaign_id: int, 
@@ -166,6 +230,7 @@ def get_campaign_lobby(
             "description": campaign.description,
             "universe_id": campaign.universe_id,
             "next_session_at": campaign.next_session_at,
+            "banner_url": campaign.banner_url,
             "invite_code": campaign.invite_code if is_gm else None
         },
         "is_gm": is_gm,
@@ -204,9 +269,10 @@ def create_campaign_note(
     return new_note
 
 @router.post("/{campaign_id}/handouts", response_model=schemas.Handout)
-def create_handout(
+async def create_handout(
     campaign_id: int,
-    handout: schemas.HandoutCreate,
+    name: str = Form(...),
+    file: UploadFile = File(...),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
@@ -215,11 +281,18 @@ def create_handout(
     if not campaign or campaign.gm_id != current_user.id:
         raise HTTPException(status_code=403, detail="Only GM can create handouts")
 
+    # Upload to Supabase
+    try:
+        folder_path = f"campaigns/{campaign_id}/handouts"
+        public_url = await upload_image_to_supabase(file, folder_path)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Image upload failed: {str(e)}")
+
     new_handout = models.Handout(
         campaign_id=campaign_id,
-        name=handout.name,
-        content=handout.content,
-        is_visible=handout.is_visible
+        name=name,
+        content=public_url, # Store the URL as content
+        is_visible=False
     )
     db.add(new_handout)
     db.commit()

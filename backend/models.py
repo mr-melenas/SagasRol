@@ -81,6 +81,7 @@ class Asset(Base):
     image_url = Column(String)
     type = Column(Enum(AssetType))
     universe_id = Column(Integer, ForeignKey("universes.id"))
+    tags = Column(ARRAY(String), default=list)
 
     # Relations
     universe = relationship("Universe", back_populates="assets")
@@ -90,6 +91,7 @@ class Campaign(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, index=True)
     description = Column(String, nullable=True)
+    banner_url = Column(String, nullable=True) # New field
     invite_code = Column("inviteCode", String, unique=True, index=True)
     gm_id = Column(String, ForeignKey("users.id"))
     universe_id = Column(Integer, ForeignKey("universes.id"), nullable=True)
@@ -174,6 +176,7 @@ class CampaignMember(Base):
     user_id = Column("userId", String, ForeignKey("users.id"))
     role = Column(String, default="PLAYER")
     joined_at = Column("joinedAt", DateTime, default=datetime.datetime.utcnow)
+    attending_next_session = Column(Boolean, default=True) # New field
 
     campaign = relationship("Campaign", back_populates="members")
     user = relationship("User", back_populates="campaign_memberships")

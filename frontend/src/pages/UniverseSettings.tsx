@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { AssetCard } from '../components/assets/AssetCard';
 import { useAuth, useUser } from '@clerk/clerk-react';
 import { Universe, Asset, AssetType, CharacterSheetTemplate } from '../types';
 import { SheetBuilder } from '../components/builder/SheetBuilder';
-import { FileText, ExternalLink, RefreshCw } from 'lucide-react';
+import { FileText, ExternalLink, RefreshCw, Image as ImageIcon } from 'lucide-react';
 
 export const UniverseSettings: React.FC = () => {
     const { id } = useParams<{ id: string }>();
@@ -37,38 +38,54 @@ export const UniverseSettings: React.FC = () => {
             if (!id) return;
             try {
                 const token = await getToken();
-                const [uniRes, assetRes, templatesRes] = await Promise.all([
-                    axios.get(`http://localhost:8000/universes/${id}`, {
-                        headers: { Authorization: `Bearer ${token}` }
-                    }),
-                    axios.get(`http://localhost:8000/universes/${id}/assets`, {
-                        headers: { Authorization: `Bearer ${token}` }
-                    }),
-                    axios.get('http://localhost:8000/sheets/', {
-                        headers: { Authorization: `Bearer ${token}` }
-                    })
-                ]);
                 
-                const uniData = uniRes.data;
-                setUniverse(uniData);
-                setAssets(assetRes.data);
-                setTemplates(templatesRes.data);
-                
-                if (uniData.sheetTemplateId) {
-                    setSelectedTemplateId(uniData.sheetTemplateId);
+                // Fetch Universe (Critical)
+                try {
+                    const uniRes = await axios.get(`http://localhost:8000/universes/${id}`, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                    const uniData = uniRes.data;
+                    setUniverse(uniData);
+                    
+                    if (uniData.sheetTemplateId) {
+                        setSelectedTemplateId(uniData.sheetTemplateId);
+                    }
+                    
+                    // Init Form
+                    setFormData({
+                        name: uniData.name,
+                        description: uniData.description || '',
+                        isPublic: uniData.isPublic ?? true,
+                        tags: uniData.tags || []
+                    });
+                } catch (err) {
+                    console.error("Critical: Failed to load universe data", err);
+                    setLoading(false);
+                    return; // Stop if universe can't be loaded
+                }
+
+                // Fetch Assets (Non-critical)
+                try {
+                    const assetRes = await axios.get(`http://localhost:8000/universes/${id}/assets`, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                    setAssets(assetRes.data);
+                } catch (err) {
+                    console.error("Warning: Failed to load assets", err);
+                }
+
+                // Fetch Templates (Non-critical)
+                try {
+                    const templatesRes = await axios.get('http://localhost:8000/sheets/', {
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                    setTemplates(templatesRes.data);
+                } catch (err) {
+                    console.error("Warning: Failed to load templates", err);
                 }
                 
-                // Init Form
-                setFormData({
-                    name: uniData.name,
-                    description: uniData.description || '',
-                    isPublic: uniData.isPublic ?? true,
-                    tags: uniData.tags || []
-                });
-                
             } catch (err) {
-                console.error("Failed to load universe", err);
-                // Handle 403 or 404
+                console.error("Unexpected error in fetchData", err);
             } finally {
                 setLoading(false);
             }
@@ -156,42 +173,84 @@ export const UniverseSettings: React.FC = () => {
         }
     };
 
-    // Asset Upload Handler (Mock for now or reuse existing logic)
+    // Asset Upload Handler
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: AssetType) => {
         const file = e.target.files?.[0];
-        if (!file || !id) return;
+        if (!file || !id || !universe) return;
+
+        // Security check: Only GM can upload
+        if (universe.gm_id !== user?.id) {
+            alert("Only the Game Master can upload assets.");
+            return;
+        }
+
+        // Validate file type
+        if (!file.type.startsWith('image/')) {
+            alert("Please upload an image file.");
+            return;
+        }
+
+        // Max size check (e.g. 5MB)
+        if (file.size > 5 * 1024 * 1024) {
+            alert("File is too large (Max 5MB).");
+            return;
+        }
+
+        setLoading(true); // Show loading state for the whole section or handle locally
 
         try {
             const token = await getToken();
-            // 1. Upload File
+            
+            // 1. Upload File to Supabase
             const uploadData = new FormData();
             uploadData.append('file', file);
+            
+            console.log("Starting upload...");
             const uploadRes = await axios.post('http://localhost:8000/assets/upload', uploadData, {
                 headers: { 
                     Authorization: `Bearer ${token}`,
                     'Content-Type': 'multipart/form-data'
                 }
             });
+            
             const imageUrl = uploadRes.data;
+            console.log("Upload successful, URL:", imageUrl);
 
-            // 2. Create Asset Record
+            // 2. Create Asset Record in DB
             const assetPayload = {
-                name: file.name.split('.')[0],
+                name: file.name.split('.')[0], // Default name from filename
                 image_url: imageUrl,
                 type: type,
-                universe_id: parseInt(id)
+                universe_id: parseInt(id),
+                tags: [] // Init empty tags
             };
             
             const createRes = await axios.post('http://localhost:8000/assets/', assetPayload, {
                 headers: { Authorization: `Bearer ${token}` }
             });
 
+            console.log("Asset created:", createRes.data);
             setAssets(prev => [...prev, createRes.data]);
-        } catch (err) {
+            alert(`${type} uploaded successfully!`);
+        } catch (err: any) {
             console.error("Upload failed", err);
-            alert("Failed to upload asset");
+            const msg = err.response?.data?.detail || "Failed to upload asset. Please try again.";
+            alert(msg);
+        } finally {
+            setLoading(false);
+            // Reset input value to allow re-uploading same file if needed
+            e.target.value = ''; 
         }
     };
+
+    const handleAssetDelete = (assetId: number) => {
+        setAssets(prev => prev.filter(a => a.id !== assetId));
+    };
+
+    const handleAssetUpdate = (updatedAsset: Asset) => {
+        setAssets(prev => prev.map(a => a.id === updatedAsset.id ? updatedAsset : a));
+    };
+
 
     const handleDeleteUniverse = async () => {
         if (!id || !universe) return;
@@ -387,22 +446,33 @@ export const UniverseSettings: React.FC = () => {
                             <div key={type} className="mb-8">
                                 <div className="flex justify-between items-center mb-2 border-b pb-1">
                                     <h4 className="font-bold text-gray-700">{type}s</h4>
-                                    <label className="cursor-pointer bg-blue-50 text-blue-600 px-3 py-1 rounded text-sm hover:bg-blue-100">
-                                        + Upload {type}
-                                        <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, type)} accept="image/*" />
-                                    </label>
+                                    {user?.id === universe.gm_id && (
+                                        <label className="cursor-pointer bg-blue-50 text-blue-600 px-3 py-1 rounded text-sm hover:bg-blue-100 transition-colors flex items-center gap-1 font-medium">
+                                            <span>+ Upload {type}</span>
+                                            <input 
+                                                type="file" 
+                                                className="hidden" 
+                                                onChange={(e) => handleFileUpload(e, type)} 
+                                                accept="image/*" 
+                                            />
+                                        </label>
+                                    )}
                                 </div>
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                     {assets.filter(a => a.type === type).map(asset => (
-                                        <div key={asset.id} className="relative group border rounded overflow-hidden">
-                                            <img src={`http://localhost:8000${asset.image_url}`} alt={asset.name} className="w-full h-32 object-cover" />
-                                            <div className="p-2 bg-white">
-                                                <p className="text-sm truncate font-medium">{asset.name}</p>
-                                            </div>
-                                        </div>
+                                        <AssetCard 
+                                            key={asset.id} 
+                                            asset={asset} 
+                                            isOwner={user?.id === universe.gm_id}
+                                            onDelete={handleAssetDelete}
+                                            onUpdate={handleAssetUpdate}
+                                        />
                                     ))}
                                     {assets.filter(a => a.type === type).length === 0 && (
-                                        <div className="text-sm text-gray-400 italic p-4">No {type.toLowerCase()}s uploaded yet.</div>
+                                        <div className="col-span-full flex flex-col items-center justify-center p-8 border-2 border-dashed border-gray-200 rounded-lg text-gray-400">
+                                            <ImageIcon size={32} className="mb-2 opacity-50" />
+                                            <p className="text-sm">No {type.toLowerCase()}s uploaded yet.</p>
+                                        </div>
                                     )}
                                 </div>
                             </div>

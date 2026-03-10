@@ -12,7 +12,11 @@ import {
   Calendar, 
   Copy, 
   PlusCircle, 
-  User as UserIcon 
+  User as UserIcon,
+  Edit2,
+  Check,
+  X,
+  Camera
 } from 'lucide-react';
 import { LobbyData } from '../../types';
 
@@ -29,6 +33,12 @@ export function CampaignLobby() {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>('general');
 
+  // Editing States
+  const [isEditingDesc, setIsEditingDesc] = useState(false);
+  const [editDescValue, setEditDescValue] = useState('');
+  const [savingDesc, setSavingDesc] = useState(false);
+  const [uploadingBanner, setUploadingBanner] = useState(false);
+
   useEffect(() => {
     const fetchLobby = async () => {
       try {
@@ -37,9 +47,10 @@ export function CampaignLobby() {
           headers: { Authorization: `Bearer ${token}` }
         });
         setLobbyData(response.data);
+        setEditDescValue(response.data.campaign.description || '');
       } catch (err: any) {
         console.error("Error fetching lobby:", err);
-        setError(err.response?.data?.detail || "Failed to load campaign lobby.");
+        setError(err.response?.data?.detail || "No se pudo cargar el lobby de la campaña.");
       } finally {
         setLoading(false);
       }
@@ -50,12 +61,78 @@ export function CampaignLobby() {
     }
   }, [id, getToken]);
 
+  const handleSaveDescription = async () => {
+    if (!lobbyData) return;
+    setSavingDesc(true);
+    try {
+      const token = await getToken();
+      await axios.patch(`http://localhost:8000/campaigns/${id}`, {
+        description: editDescValue
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      // Update local state
+      setLobbyData({
+        ...lobbyData,
+        campaign: {
+          ...lobbyData.campaign,
+          description: editDescValue
+        }
+      });
+      setIsEditingDesc(false);
+    } catch (err) {
+      console.error("Failed to save description", err);
+      alert("Error al guardar la descripción.");
+    } finally {
+      setSavingDesc(false);
+    }
+  };
+
+  const handleBannerUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !lobbyData) return;
+
+    if (!file.type.startsWith('image/')) {
+        alert("Por favor selecciona un archivo de imagen válido.");
+        return;
+    }
+
+    setUploadingBanner(true);
+    try {
+        const token = await getToken();
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const res = await axios.post(`http://localhost:8000/campaigns/${id}/banner`, formData, {
+            headers: { 
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'multipart/form-data'
+            }
+        });
+
+        // Update local state with new banner URL
+        setLobbyData({
+            ...lobbyData,
+            campaign: {
+                ...lobbyData.campaign,
+                banner_url: res.data.banner_url
+            }
+        });
+    } catch (err) {
+        console.error("Banner upload failed", err);
+        alert("Error al subir el banner.");
+    } finally {
+        setUploadingBanner(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center text-white">
         <div className="animate-pulse flex flex-col items-center">
           <div className="h-12 w-12 bg-gray-700 rounded-full mb-4"></div>
-          <p>Summoning the lobby...</p>
+          <p>Invocando el lobby...</p>
         </div>
       </div>
     );
@@ -65,13 +142,13 @@ export function CampaignLobby() {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center text-white">
         <div className="text-center p-8 bg-gray-800 rounded-lg border border-red-800">
-          <h2 className="text-2xl font-bold text-red-500 mb-2">Critical Failure</h2>
-          <p className="text-gray-300">{error || "Campaign not found"}</p>
+          <h2 className="text-2xl font-bold text-red-500 mb-2">Fallo Crítico</h2>
+          <p className="text-gray-300">{error || "Campaña no encontrada"}</p>
           <button 
             onClick={() => navigate('/dashboard')}
             className="mt-4 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm transition-colors"
           >
-            Return to Dashboard
+            Volver al Dashboard
           </button>
         </div>
       </div>
@@ -95,13 +172,62 @@ export function CampaignLobby() {
         return (
           <div className="space-y-6 animate-in fade-in duration-300">
             {/* Description Card */}
-            <div className="bg-gray-800 rounded-xl p-6 border border-gray-700 shadow-lg">
-              <h3 className="text-xl font-bold text-indigo-400 mb-4 flex items-center gap-2">
-                <Info size={20} /> About the Campaign
-              </h3>
-              <p className="text-gray-300 leading-relaxed whitespace-pre-wrap">
-                {campaign.description || "No description provided for this adventure."}
-              </p>
+            <div className="bg-gray-800 rounded-xl p-6 border border-gray-700 shadow-lg relative group">
+              <div className="flex justify-between items-start mb-4">
+                  <h3 className="text-xl font-bold text-indigo-400 flex items-center gap-2">
+                    <Info size={20} /> Sobre la Campaña
+                  </h3>
+                  
+                  {is_gm && !isEditingDesc && (
+                      <button 
+                        onClick={() => setIsEditingDesc(true)}
+                        className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors"
+                        title="Editar descripción"
+                      >
+                          <Edit2 size={16} />
+                      </button>
+                  )}
+              </div>
+              
+              {isEditingDesc ? (
+                  <div className="space-y-3">
+                      <textarea
+                          value={editDescValue}
+                          onChange={(e) => setEditDescValue(e.target.value)}
+                          className="w-full h-40 bg-gray-900 border border-gray-600 rounded-lg p-3 text-gray-200 focus:ring-2 focus:ring-indigo-500 outline-none resize-none"
+                          placeholder="Escribe la descripción de tu campaña..."
+                      />
+                      <div className="flex justify-end gap-2">
+                          <button 
+                              onClick={() => {
+                                  setIsEditingDesc(false);
+                                  setEditDescValue(campaign.description || '');
+                              }}
+                              className="px-3 py-1.5 text-sm text-gray-400 hover:text-white hover:bg-gray-700 rounded-md flex items-center gap-1"
+                              disabled={savingDesc}
+                          >
+                              <X size={14} /> Cancelar
+                          </button>
+                          <button 
+                              onClick={handleSaveDescription}
+                              className="px-3 py-1.5 text-sm bg-indigo-600 text-white hover:bg-indigo-500 rounded-md flex items-center gap-1 shadow-md"
+                              disabled={savingDesc}
+                          >
+                              {savingDesc ? (
+                                  <span className="animate-pulse">Guardando...</span>
+                              ) : (
+                                  <>
+                                    <Check size={14} /> Guardar
+                                  </>
+                              )}
+                          </button>
+                      </div>
+                  </div>
+              ) : (
+                  <p className="text-gray-300 leading-relaxed whitespace-pre-wrap">
+                    {campaign.description || "No hay descripción disponible para esta aventura."}
+                  </p>
+              )}
             </div>
 
             {/* GM Only: Invite Code */}
@@ -110,8 +236,8 @@ export function CampaignLobby() {
                 <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
                   <Shield size={100} />
                 </div>
-                <h3 className="text-lg font-bold text-white mb-2">Invite Adventurers</h3>
-                <p className="text-gray-400 text-sm mb-4">Share this code with your players to let them join the lobby.</p>
+                <h3 className="text-lg font-bold text-white mb-2">Invitar Aventureros</h3>
+                <p className="text-gray-400 text-sm mb-4">Comparte este código con tus jugadores para que se unan al lobby.</p>
                 
                 <div className="flex items-center gap-2 bg-black/30 p-3 rounded-lg border border-gray-700 max-w-md">
                   <code className="flex-1 font-mono text-xl text-yellow-400 tracking-wider text-center">
@@ -120,7 +246,7 @@ export function CampaignLobby() {
                   <button 
                     onClick={copyInviteCode}
                     className="p-2 hover:bg-gray-700 rounded text-gray-400 hover:text-white transition-colors"
-                    title="Copy Code"
+                    title="Copiar Código"
                   >
                     <Copy size={18} />
                   </button>
@@ -138,16 +264,16 @@ export function CampaignLobby() {
               <div className="bg-gradient-to-r from-indigo-900 to-purple-900 rounded-xl p-8 border border-indigo-500 shadow-2xl text-center relative overflow-hidden">
                 <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-20"></div>
                 <div className="relative z-10">
-                  <h2 className="text-2xl font-bold text-white mb-2">Your Hero is Missing!</h2>
+                  <h2 className="text-2xl font-bold text-white mb-2">¡Falta tu Héroe!</h2>
                   <p className="text-indigo-200 mb-6 max-w-lg mx-auto">
-                    You have joined the lobby, but you haven't assigned a character to this campaign yet. 
-                    Create one now to prepare for the adventure.
+                    Te has unido al lobby, pero aún no has asignado un personaje a esta campaña. 
+                    Crea uno ahora para prepararte para la aventura.
                   </p>
                   <button 
                     onClick={() => navigate(`/characters/create?campaign_id=${campaign.id}`)}
                     className="bg-white text-indigo-900 px-6 py-3 rounded-lg font-bold hover:bg-indigo-50 transition-colors shadow-lg flex items-center gap-2 mx-auto"
                   >
-                    <PlusCircle size={20} /> Create Character
+                    <PlusCircle size={20} /> Crear Personaje
                   </button>
                 </div>
               </div>
@@ -169,11 +295,11 @@ export function CampaignLobby() {
                       <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${
                         member.role === 'GM' ? 'bg-yellow-600 text-black' : 'bg-gray-600 text-white'
                       }`}>
-                        {member.role === 'GM' ? 'GM' : 'PC'}
+                        {member.role === 'GM' ? 'GM' : 'PJ'}
                       </div>
                       <div>
                         <p className="font-semibold text-gray-200">{member.username}</p>
-                        <p className="text-xs text-gray-500">Joined {new Date(member.joined_at).toLocaleDateString()}</p>
+                        <p className="text-xs text-gray-500">Unido el {new Date(member.joined_at).toLocaleDateString()}</p>
                       </div>
                     </div>
                   </div>
@@ -197,13 +323,13 @@ export function CampaignLobby() {
                                 onClick={() => navigate(`/character/${member.character!.id}`)}
                                 className="text-indigo-400 text-xs hover:text-indigo-300 mt-1 hover:underline"
                              >
-                                View Sheet
+                                Ver Hoja
                              </button>
                          </div>
                       </div>
                     ) : (
                       <div className="h-16 flex items-center justify-center text-gray-500 italic text-sm bg-gray-900/30 rounded-lg border border-dashed border-gray-700">
-                        {member.role === 'GM' ? 'Game Master' : 'No Character Created'}
+                        {member.role === 'GM' ? 'Game Master' : 'Sin Personaje'}
                       </div>
                     )}
                   </div>
@@ -217,9 +343,9 @@ export function CampaignLobby() {
         return (
             <div className="flex flex-col items-center justify-center h-64 text-gray-500 bg-gray-800/50 rounded-xl border border-gray-700 border-dashed">
                 <ScrollText size={48} className="mb-4 opacity-50" />
-                <h3 className="text-lg font-semibold">Campaign Notes</h3>
-                <p className="text-sm">This module is under construction.</p>
-                <p className="text-xs mt-2">Manage your private journal and shared lore here.</p>
+                <h3 className="text-lg font-semibold">Diario de Campaña</h3>
+                <p className="text-sm">Módulo en construcción.</p>
+                <p className="text-xs mt-2">Gestiona tu diario privado y lore compartido aquí.</p>
             </div>
         );
 
@@ -227,9 +353,9 @@ export function CampaignLobby() {
         return (
             <div className="flex flex-col items-center justify-center h-64 text-gray-500 bg-gray-800/50 rounded-xl border border-gray-700 border-dashed">
                 <BookOpen size={48} className="mb-4 opacity-50" />
-                <h3 className="text-lg font-semibold">Library & Handouts</h3>
-                <p className="text-sm">This module is under construction.</p>
-                <p className="text-xs mt-2">Access maps, documents, and rules here.</p>
+                <h3 className="text-lg font-semibold">Biblioteca y Handouts</h3>
+                <p className="text-sm">Módulo en construcción.</p>
+                <p className="text-xs mt-2">Accede a mapas, documentos y reglas aquí.</p>
             </div>
         );
 
@@ -241,32 +367,63 @@ export function CampaignLobby() {
   return (
     <div className="min-h-screen bg-gray-900 text-gray-100 font-sans selection:bg-indigo-500 selection:text-white">
       {/* Header Image / Gradient */}
-      <div className="h-48 bg-gradient-to-b from-indigo-900 to-gray-900 relative">
-        <div className="absolute inset-0 bg-black/40"></div>
+      <div className="h-48 md:h-64 relative group">
+        {/* Banner Image */}
+        <div className="absolute inset-0 bg-gray-900 overflow-hidden">
+            {campaign.banner_url ? (
+                <img 
+                    src={campaign.banner_url} 
+                    alt="Campaign Banner" 
+                    className="w-full h-full object-cover opacity-60"
+                />
+            ) : (
+                <div className="w-full h-full bg-gradient-to-b from-indigo-900 to-gray-900 opacity-80" />
+            )}
+            <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/60 to-transparent" />
+        </div>
+
+        {/* Edit Banner Button (GM Only) */}
+        {is_gm && (
+            <label className="absolute top-4 right-4 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full cursor-pointer transition-all opacity-0 group-hover:opacity-100 border border-white/20">
+                {uploadingBanner ? (
+                    <div className="w-5 h-5 border-2 border-white/50 border-t-white rounded-full animate-spin" />
+                ) : (
+                    <Camera size={20} />
+                )}
+                <input 
+                    type="file" 
+                    accept="image/*" 
+                    className="hidden" 
+                    onChange={handleBannerUpload}
+                    disabled={uploadingBanner}
+                />
+            </label>
+        )}
+
         <div className="container mx-auto px-6 h-full flex flex-col justify-end pb-8 relative z-10">
-          <div className="flex justify-between items-end">
+          <div className="flex flex-col md:flex-row justify-between items-end gap-4">
             <div>
               <div className="flex items-center gap-3 mb-2">
                 <span className={`px-3 py-1 rounded-full text-xs font-bold tracking-wide uppercase ${
                   is_gm ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/50' : 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/50'
                 }`}>
-                  {is_gm ? 'Game Master' : 'Player'}
+                  {is_gm ? 'Game Master' : 'Jugador'}
                 </span>
                 {campaign.next_session_at && (
                   <span className="flex items-center gap-1 text-gray-400 text-xs bg-black/50 px-2 py-1 rounded border border-gray-700">
                     <Calendar size={12} />
-                    Next Session: {new Date(campaign.next_session_at).toLocaleDateString()}
+                    Próxima Sesión: {new Date(campaign.next_session_at).toLocaleDateString()}
                   </span>
                 )}
               </div>
-              <h1 className="text-4xl font-extrabold text-white tracking-tight drop-shadow-lg">{campaign.name}</h1>
+              <h1 className="text-4xl md:text-5xl font-extrabold text-white tracking-tight drop-shadow-lg shadow-black">{campaign.name}</h1>
             </div>
             
             <button 
                onClick={() => navigate(`/game/${campaign.id}`)}
-               className="bg-green-600 hover:bg-green-500 text-white px-6 py-3 rounded-lg font-bold shadow-lg shadow-green-900/20 transition-all flex items-center gap-2"
+               className="bg-green-600 hover:bg-green-500 text-white px-6 py-3 rounded-lg font-bold shadow-lg shadow-green-900/20 transition-all flex items-center gap-2 w-full md:w-auto justify-center"
             >
-               <Swords size={20} /> Enter Game Room
+               <Swords size={20} /> Entrar a la Partida
             </button>
           </div>
         </div>
@@ -276,17 +433,17 @@ export function CampaignLobby() {
       <div className="container mx-auto px-6 py-8">
         
         {/* Tabs Navigation */}
-        <div className="flex gap-2 border-b border-gray-700 mb-8 overflow-x-auto pb-1">
+        <div className="flex gap-2 border-b border-gray-700 mb-8 overflow-x-auto pb-1 no-scrollbar">
           {[
-            { id: 'general', label: 'Overview', icon: Info },
-            { id: 'party', label: 'Party', icon: Users },
-            { id: 'notes', label: 'Journal', icon: ScrollText },
-            { id: 'library', label: 'Library', icon: BookOpen },
+            { id: 'general', label: 'Resumen', icon: Info },
+            { id: 'party', label: 'Grupo', icon: Users },
+            { id: 'notes', label: 'Diario', icon: ScrollText },
+            { id: 'library', label: 'Biblioteca', icon: BookOpen },
           ].map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as TabType)}
-              className={`flex items-center gap-2 px-6 py-3 rounded-t-lg font-medium transition-all ${
+              className={`flex items-center gap-2 px-6 py-3 rounded-t-lg font-medium transition-all whitespace-nowrap ${
                 activeTab === tab.id 
                   ? 'bg-gray-800 text-indigo-400 border-b-2 border-indigo-500' 
                   : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/50'

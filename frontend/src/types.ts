@@ -77,6 +77,7 @@ export interface Asset {
     image_url: string;
     type: AssetType;
     universe_id: number;
+    tags?: string[];
 }
 
 export interface CampaignMember {
@@ -111,6 +112,7 @@ export interface Campaign {
     id: number;
     name: string;
     description?: string;
+    banner_url?: string; // New field
     invite_code?: string; // Only if GM
     universe_id: number;
     gm_id: string;
@@ -128,6 +130,7 @@ export interface LobbyData {
         id: number;
         name: string;
         description: string;
+        banner_url?: string; // New field
         invite_code?: string;
         next_session_at?: string;
     };
