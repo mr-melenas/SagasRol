@@ -1,4 +1,13 @@
-from fastapi import FastAPI, Depends, HTTPException, status
+import os
+import sys
+
+# Ensure root is in path
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
+
+from fastapi import FastAPI, Depends, HTTPException, status, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.staticfiles import StaticFiles
@@ -6,16 +15,8 @@ from sqlalchemy.orm import Session
 from datetime import timedelta
 import socketio
 from typing import List
-import os
-
-import sys
-import os
-
-# Ensure root is in path
-current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(current_dir)
-if parent_dir not in sys.path:
-    sys.path.insert(0, parent_dir)
+import time
+from backend.utils.storage import upload_image_to_supabase
 
 from backend import models, database, schemas, auth
 from backend.routers import universes, sheets, campaigns
@@ -86,6 +87,35 @@ def create_character(character: schemas.CharacterCreate, db: Session = Depends(d
     db.commit()
     db.refresh(db_character)
     return db_character
+
+@app.patch("/characters/{character_id}", response_model=schemas.Character)
+def patch_character(character_id: int, character_update: schemas.CharacterUpdate, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
+    return update_character(character_id, character_update, db, current_user)
+
+@app.post("/characters/{character_id}/avatar", response_model=schemas.Character)
+async def upload_character_avatar(character_id: int, file: UploadFile = File(...), db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
+    db_character = db.query(models.Character).filter(models.Character.id == character_id).first()
+    if not db_character:
+        raise HTTPException(status_code=404, detail="Character not found")
+    
+    if db_character.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    try:
+        # Upload to Supabase
+        image_url = await upload_image_to_supabase(file, f"avatars/{character_id}")
+        
+        # Add timestamp for cache busting
+        timestamp = int(time.time())
+        final_url = f"{image_url}?v={timestamp}"
+        
+        db_character.image_url = final_url
+        db.commit()
+        db.refresh(db_character)
+        return db_character
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Image upload failed: {str(e)}")
+
 
 @app.get("/my-characters/", response_model=List[schemas.Character])
 def read_my_characters(db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):

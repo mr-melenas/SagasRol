@@ -19,6 +19,7 @@ import {
   Camera
 } from 'lucide-react';
 import { LobbyData, AttendanceStatus } from '../../types';
+import { CharacterAvatar } from '../../components/player/CharacterAvatar';
 
 type TabType = 'general' | 'party' | 'notes' | 'library';
 
@@ -439,13 +440,12 @@ export function CampaignLobby() {
                             <div key={member.user_id} className="bg-gray-800 p-4 rounded-lg border border-yellow-700/30 flex items-center justify-between">
                                 <div className="flex items-center gap-3">
                                     <div className="w-10 h-10 rounded-full bg-gray-700 overflow-hidden">
-                                         {member.character?.image_url ? (
-                                            <img src={member.character.image_url} alt={member.username} className="w-full h-full object-cover" />
-                                        ) : (
-                                            <div className="w-full h-full flex items-center justify-center text-gray-400">
-                                                <UserIcon size={16} />
-                                            </div>
-                                        )}
+                                         <CharacterAvatar 
+                                            characterId={member.character?.id}
+                                            initialImageUrl={member.character?.image_url}
+                                            name={member.username}
+                                            className="w-full h-full"
+                                        />
                                     </div>
                                     <div>
                                         <p className="font-bold text-sm text-gray-200">{member.character?.name || member.username}</p>
@@ -486,13 +486,12 @@ export function CampaignLobby() {
                         {attendees.map(member => (
                             <div key={member.user_id} className="flex flex-col items-center group">
                                 <div className="w-14 h-14 rounded-full border-2 border-green-500/50 overflow-hidden shadow-lg shadow-green-900/20 group-hover:scale-105 transition-transform bg-gray-800">
-                                    {member.character?.image_url ? (
-                                        <img src={member.character.image_url} alt={member.username} className="w-full h-full object-cover" />
-                                    ) : (
-                                        <div className="w-full h-full flex items-center justify-center text-gray-400">
-                                            <UserIcon size={20} />
-                                        </div>
-                                    )}
+                                    <CharacterAvatar 
+                                        characterId={member.character?.id}
+                                        initialImageUrl={member.character?.image_url}
+                                        name={member.username}
+                                        className="w-full h-full"
+                                    />
                                 </div>
                                 <span className="text-xs font-medium text-gray-300 mt-2 text-center max-w-[80px] truncate">
                                     {member.character?.name || member.username}
@@ -548,13 +547,12 @@ export function CampaignLobby() {
                         {member.character ? (
                         <div className="flex gap-4">
                             <div className="w-16 h-16 bg-gray-700 rounded-lg overflow-hidden flex-shrink-0 border border-gray-600">
-                                {member.character.image_url ? (
-                                    <img src={member.character.image_url} alt={member.character.name} className="w-full h-full object-cover" />
-                                ) : (
-                                    <div className="w-full h-full flex items-center justify-center text-gray-500">
-                                        <UserIcon size={24} />
-                                    </div>
-                                )}
+                                <CharacterAvatar 
+                                    characterId={member.character?.id}
+                                    initialImageUrl={member.character?.image_url}
+                                    name={member.character.name}
+                                    className="w-full h-full"
+                                />
                             </div>
                             <div>
                                 <h4 className="font-bold text-white text-lg">{member.character.name}</h4>

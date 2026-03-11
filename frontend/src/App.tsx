@@ -47,12 +47,17 @@ function AuthSync() {
   return null;
 }
 
+import { useStore } from './store/useStore';
+import { CharacterAvatar } from './components/player/CharacterAvatar';
+
 function Dashboard() {
   const { user } = useUser();
   const { getToken } = useAuth();
   const navigate = useNavigate();
   const [universes, setUniverses] = useState<Universe[]>([]);
-  const [characters, setCharacters] = useState<Character[]>([]);
+  // const [characters, setCharacters] = useState<Character[]>([]); // Removed local state
+  const { myCharacters, setMyCharacters } = useStore(); // Use global store
+  
   const [loadingUniverses, setLoadingUniverses] = useState(true);
   const [loadingCharacters, setLoadingCharacters] = useState(true);
 
@@ -62,16 +67,16 @@ function Dashboard() {
               const token = await getToken();
               const headers = { Authorization: `Bearer ${token}` };
               
+              // Only fetch if we don't have characters or force refresh?
+              // For dashboard, fetching fresh is good.
+              
               const [universesRes, charactersRes] = await Promise.all([
                   axios.get('http://localhost:8000/universes/', { headers }),
                   axios.get('http://localhost:8000/my-characters/', { headers })
               ]);
               
-              console.log("Universes Response:", universesRes.data);
-              console.log("Characters Response:", charactersRes.data);
-
               setUniverses(universesRes.data);
-              setCharacters(charactersRes.data);
+              setMyCharacters(charactersRes.data);
           } catch (err) {
               console.error("Failed to fetch data", err);
           } finally {
@@ -80,7 +85,7 @@ function Dashboard() {
           }
       };
       if (user) fetchData();
-  }, [user, getToken]);
+  }, [user, getToken, setMyCharacters]);
   
   const handleCreateUniverse = () => {
     navigate('/create-universe');
@@ -188,27 +193,22 @@ function Dashboard() {
                 <div className="flex justify-center py-8">
                     <span className="text-gray-400 animate-pulse">Loading characters...</span>
                 </div>
-            ) : characters.length === 0 ? (
+            ) : myCharacters.length === 0 ? (
                 <div className="text-center py-10 border-2 border-dashed border-gray-300 rounded-lg">
                     <p className="text-gray-500 mb-2">You haven't created any character yet.</p>
                     <button onClick={handleCreateCharacter} className="text-indigo-600 font-semibold hover:underline">Create your first character</button>
                 </div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {characters.map(character => (
+                    {myCharacters.map(character => (
                         <div key={character.id} className="bg-white rounded-lg shadow overflow-hidden border hover:border-indigo-300 transition-all group">
                              <div className="h-40 bg-gray-200 relative">
-                                {character.image_url ? (
-                                    <img 
-                                        src={character.image_url} 
-                                        alt={character.name} 
-                                        className="w-full h-full object-cover"
-                                    />
-                                ) : (
-                                    <div className="w-full h-full flex items-center justify-center text-gray-400 bg-gray-100">
-                                        <span className="text-4xl">👤</span>
-                                    </div>
-                                )}
+                                <CharacterAvatar 
+                                    characterId={character.id}
+                                    initialImageUrl={character.image_url || undefined}
+                                    name={character.name}
+                                    className="w-full h-full"
+                                />
                             </div>
                             <div className="p-4">
                                 <h4 className="font-bold text-lg mb-1 truncate">{character.name}</h4>

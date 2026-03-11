@@ -6,7 +6,8 @@ import axios from 'axios';
 import { useAuth } from '@clerk/clerk-react';
 import { CharacterSheetView } from '../components/player/CharacterSheetView';
 import { useCharacterStore } from '../store/useCharacterStore';
-import { Save } from 'lucide-react';
+import { useStore } from '../store/useStore';
+import { Save, Camera } from 'lucide-react';
 
 export const CharacterSheet: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -17,6 +18,7 @@ export const CharacterSheet: React.FC = () => {
   
   const { getToken } = useAuth();
   const { setValues, characterValues } = useCharacterStore();
+  const { updateCharacterAvatar } = useStore();
 
   const fetchData = async () => {
     try {
@@ -49,6 +51,38 @@ export const CharacterSheet: React.FC = () => {
   useEffect(() => {
     if (id) fetchData();
   }, [id]);
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      try {
+          const token = await getToken();
+          const formData = new FormData();
+          formData.append('file', file);
+          
+          const res = await axios.post(`http://localhost:8000/characters/${id}/avatar`, formData, {
+              headers: { 
+                  Authorization: `Bearer ${token}`,
+                  'Content-Type': 'multipart/form-data'
+              }
+          });
+          
+          const newUrl = res.data.image_url;
+          
+          // Update local state
+          setCharacter(prev => prev ? { ...prev, image_url: newUrl } : null);
+          
+          // Update Global Store
+          if (character?.id) {
+              updateCharacterAvatar(character.id, newUrl);
+          }
+          
+      } catch (err) {
+          console.error("Failed to upload avatar", err);
+          alert("Failed to upload avatar");
+      }
+  };
 
   const handleSave = async () => {
       setSaving(true);
@@ -89,12 +123,24 @@ export const CharacterSheet: React.FC = () => {
       {/* Header */}
       <div className="flex gap-6 mb-8 items-center bg-white p-6 rounded-lg shadow-sm border justify-between">
         <div className="flex gap-6 items-center">
-            <div className="w-24 h-24 bg-gray-200 rounded-full flex-shrink-0 overflow-hidden border-2 border-indigo-100">
-            {character.image_url ? (
-                <img src={character.image_url} alt={character.name} className="w-full h-full object-cover"/>
-            ) : (
-                <div className="w-full h-full flex items-center justify-center text-3xl">👤</div>
-            )}
+            <div className="relative group w-24 h-24 bg-gray-200 rounded-full flex-shrink-0 overflow-hidden border-2 border-indigo-100 cursor-pointer shadow-md">
+                {character.image_url ? (
+                    <img src={character.image_url} alt={character.name} className="w-full h-full object-cover"/>
+                ) : (
+                    <div className="w-full h-full flex items-center justify-center text-3xl">👤</div>
+                )}
+                
+                {/* Overlay for upload */}
+                <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Camera className="text-white" size={24} />
+                </div>
+
+                <input 
+                    type="file" 
+                    accept="image/*" 
+                    onChange={handleImageUpload}
+                    className="absolute inset-0 opacity-0 cursor-pointer"
+                />
             </div>
             <div>
             <h1 className="text-3xl font-bold text-gray-900">{character.name}</h1>
