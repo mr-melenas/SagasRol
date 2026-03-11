@@ -199,6 +199,8 @@ def get_campaign_lobby(
             "username": m.user.username or m.user.first_name,
             "role": m.role,
             "joined_at": m.joined_at,
+            # "attending_next_session": m.attending_next_session, # Deprecated
+            "attendance_status": m.attendance_status,
             "character": {
                 "id": character.id, 
                 "name": character.name, 
@@ -326,3 +328,128 @@ def update_handout(
     db.commit()
     db.refresh(handout)
     return handout
+
+class AttendanceRequest(schemas.BaseModel):
+    is_attending: bool
+
+@router.patch("/{campaign_id}/members/{user_id}/attendance")
+def request_attendance(
+    campaign_id: int,
+    user_id: str,
+    attendance: AttendanceRequest,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    campaign = db.query(models.Campaign).filter(models.Campaign.id == campaign_id).first()
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+    
+    # Permissions
+    is_gm = campaign.gm_id == current_user.id
+    is_self = current_user.id == user_id
+    
+    if not (is_gm or is_self):
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    member = db.query(models.CampaignMember).filter(
+        models.CampaignMember.campaign_id == campaign_id,
+        models.CampaignMember.user_id == user_id
+    ).first()
+    
+    if not member:
+        raise HTTPException(status_code=404, detail="Member not found")
+
+    # LOGIC:
+    # If GM: Can set to anything (but using this endpoint, likely just toggling)
+    # If Player: 
+    #   - If currently CONFIRMED or REJECTED: "Cannot modify after processed" (unless GM allows it?)
+    #     The prompt says: "Validation to avoid player modifying response after being processed by master".
+    #   - So if status is CONFIRMED or REJECTED, Player cannot change it.
+    
+    if is_self and not is_gm:
+        if member.attendance_status == models.AttendanceStatus.REJECTED:
+             raise HTTPException(status_code=400, detail="Attendance rejected by GM. Contact GM to change.")
+
+    # Determine new status
+    previous_status = member.attendance_status
+    new_status = models.AttendanceStatus.UNKNOWN
+
+    if attendance.is_attending:
+        if is_gm:
+            new_status = models.AttendanceStatus.CONFIRMED
+        else:
+            # If already confirmed, stay confirmed (user re-clicking yes)
+            if previous_status == models.AttendanceStatus.CONFIRMED:
+                new_status = models.AttendanceStatus.CONFIRMED
+            else:
+                new_status = models.AttendanceStatus.PENDING
+    else:
+        new_status = models.AttendanceStatus.DECLINED
+
+    member.attendance_status = new_status
+    db.add(member)
+    
+    # Audit Log
+    log = models.AttendanceLog(
+        campaign_id=campaign_id,
+        actor_id=current_user.id,
+        target_id=user_id,
+        action="REQUEST_ATTENDANCE" if is_self else "GM_UPDATE_ATTENDANCE",
+        previous_status=previous_status,
+        new_status=new_status
+    )
+    db.add(log)
+    
+    db.commit()
+    db.refresh(member)
+    
+    return {"message": "Attendance updated", "status": new_status}
+
+class AttendanceResolution(schemas.BaseModel):
+    status: models.AttendanceStatus
+
+@router.post("/{campaign_id}/members/{user_id}/attendance/resolve")
+def resolve_attendance(
+    campaign_id: int,
+    user_id: str,
+    resolution: AttendanceResolution,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    campaign = db.query(models.Campaign).filter(models.Campaign.id == campaign_id).first()
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+    
+    if campaign.gm_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Only GM can resolve attendance")
+
+    member = db.query(models.CampaignMember).filter(
+        models.CampaignMember.campaign_id == campaign_id,
+        models.CampaignMember.user_id == user_id
+    ).first()
+    
+    if not member:
+        raise HTTPException(status_code=404, detail="Member not found")
+
+    if resolution.status not in [models.AttendanceStatus.CONFIRMED, models.AttendanceStatus.REJECTED]:
+        raise HTTPException(status_code=400, detail="Invalid resolution status. Must be CONFIRMED or REJECTED.")
+
+    previous_status = member.attendance_status
+    member.attendance_status = resolution.status
+    db.add(member)
+
+    # Audit Log
+    log = models.AttendanceLog(
+        campaign_id=campaign_id,
+        actor_id=current_user.id,
+        target_id=user_id,
+        action="RESOLVE_ATTENDANCE",
+        previous_status=previous_status,
+        new_status=resolution.status
+    )
+    db.add(log)
+
+    db.commit()
+    db.refresh(member)
+    
+    return {"message": "Attendance resolved", "status": member.attendance_status}

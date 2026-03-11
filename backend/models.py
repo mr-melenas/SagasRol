@@ -27,6 +27,13 @@ class AssetType(str, enum.Enum):
     ENEMY = "ENEMY"
     ITEM = "ITEM"
 
+class AttendanceStatus(str, enum.Enum):
+    UNKNOWN = "UNKNOWN"
+    PENDING = "PENDING"
+    CONFIRMED = "CONFIRMED"
+    DECLINED = "DECLINED" # Player said no
+    REJECTED = "REJECTED" # GM said no
+
 class User(Base):
     __tablename__ = "users"
     id = Column(String, primary_key=True, index=True) # Clerk ID
@@ -176,10 +183,23 @@ class CampaignMember(Base):
     user_id = Column("userId", String, ForeignKey("users.id"))
     role = Column(String, default="PLAYER")
     joined_at = Column("joinedAt", DateTime, default=datetime.datetime.utcnow)
-    attending_next_session = Column(Boolean, default=True) # New field
+    # attending_next_session = Column(Boolean, default=True) # Deprecated
+    attendance_status = Column(Enum(AttendanceStatus), default=AttendanceStatus.UNKNOWN)
 
     campaign = relationship("Campaign", back_populates="members")
     user = relationship("User", back_populates="campaign_memberships")
+
+class AttendanceLog(Base):
+    __tablename__ = "attendance_logs"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    campaign_id = Column(Integer, ForeignKey("campaigns.id"))
+    actor_id = Column(String, ForeignKey("users.id")) # Who performed the action
+    target_id = Column(String, ForeignKey("users.id")) # Whose attendance was changed
+    action = Column(String) # "REQUEST", "CANCEL", "ACCEPT", "REJECT"
+    previous_status = Column(Enum(AttendanceStatus))
+    new_status = Column(Enum(AttendanceStatus))
+    timestamp = Column(DateTime, default=datetime.datetime.utcnow)
 
 class CampaignNote(Base):
     __tablename__ = "campaign_notes"

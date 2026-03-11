@@ -80,11 +80,21 @@ export interface Asset {
     tags?: string[];
 }
 
+export enum AttendanceStatus {
+    UNKNOWN = "UNKNOWN",
+    PENDING = "PENDING",
+    CONFIRMED = "CONFIRMED",
+    DECLINED = "DECLINED",
+    REJECTED = "REJECTED"
+}
+
 export interface CampaignMember {
     user_id: string;
     username: string;
     role: string;
     joined_at: string;
+    // attending_next_session: boolean; // Deprecated
+    attendance_status: AttendanceStatus;
     character?: {
         id: number;
         name: string;

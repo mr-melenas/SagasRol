@@ -18,7 +18,7 @@ import {
   X,
   Camera
 } from 'lucide-react';
-import { LobbyData } from '../../types';
+import { LobbyData, AttendanceStatus } from '../../types';
 
 type TabType = 'general' | 'party' | 'notes' | 'library';
 
@@ -32,6 +32,7 @@ export function CampaignLobby() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>('general');
+  const [processingAttendance, setProcessingAttendance] = useState<string | null>(null);
 
   // Editing States
   const [isEditingDesc, setIsEditingDesc] = useState(false);
@@ -40,25 +41,48 @@ export function CampaignLobby() {
   const [uploadingBanner, setUploadingBanner] = useState(false);
 
   useEffect(() => {
-    const fetchLobby = async () => {
+    let intervalId: NodeJS.Timeout;
+    let isMounted = true;
+
+    const fetchLobby = async (silent = false) => {
       try {
         const token = await getToken();
+        if (!token) return;
+
         const response = await axios.get(`http://localhost:8000/campaigns/${id}/lobby`, {
           headers: { Authorization: `Bearer ${token}` }
         });
-        setLobbyData(response.data);
-        setEditDescValue(response.data.campaign.description || '');
+        
+        if (isMounted) {
+            setLobbyData(response.data);
+            if (!silent) {
+                setEditDescValue(response.data.campaign.description || '');
+                setLoading(false);
+            }
+        }
       } catch (err: any) {
         console.error("Error fetching lobby:", err);
-        setError(err.response?.data?.detail || "No se pudo cargar el lobby de la campaña.");
-      } finally {
-        setLoading(false);
+        if (isMounted && !silent) {
+            setError(err.response?.data?.detail || "No se pudo cargar el lobby de la campaña.");
+            setLoading(false);
+        }
       }
     };
 
     if (id) {
+      // Initial fetch
       fetchLobby();
+
+      // Polling every 10 seconds
+      intervalId = setInterval(() => {
+        fetchLobby(true);
+      }, 10000);
     }
+
+    return () => {
+        isMounted = false;
+        if (intervalId) clearInterval(intervalId);
+    };
   }, [id, getToken]);
 
   const handleSaveDescription = async () => {
@@ -127,6 +151,67 @@ export function CampaignLobby() {
     }
   };
 
+  const handleAttendanceRequest = async (userId: string, isAttending: boolean) => {
+      setProcessingAttendance(userId);
+      try {
+          const token = await getToken();
+          const res = await axios.patch(`http://localhost:8000/campaigns/${id}/members/${userId}/attendance`, {
+              is_attending: isAttending
+          }, {
+              headers: { Authorization: `Bearer ${token}` }
+          });
+          
+          // Update local state
+          setLobbyData(prev => {
+              if (!prev) return null;
+              return {
+                  ...prev,
+                  party: prev.party.map(m => 
+                      m.user_id === userId 
+                          ? { ...m, attendance_status: res.data.status }
+                          : m
+                  )
+              };
+          });
+      } catch (err: any) {
+          console.error("Failed to update attendance", err);
+          alert(err.response?.data?.detail || "Error al actualizar la asistencia.");
+      } finally {
+          setProcessingAttendance(null);
+      }
+  };
+
+  const handleAttendanceResolution = async (userId: string, status: AttendanceStatus) => {
+      setProcessingAttendance(userId);
+      try {
+          const token = await getToken();
+          const res = await axios.post(`http://localhost:8000/campaigns/${id}/members/${userId}/attendance/resolve`, {
+              status: status
+          }, {
+              headers: { Authorization: `Bearer ${token}` }
+          });
+
+          // Update local state
+          setLobbyData(prev => {
+              if (!prev) return null;
+              return {
+                  ...prev,
+                  party: prev.party.map(m => 
+                      m.user_id === userId 
+                          ? { ...m, attendance_status: res.data.status }
+                          : m
+                  )
+              };
+          });
+      } catch (err: any) {
+          console.error("Failed to resolve attendance", err);
+          alert(err.response?.data?.detail || "Error al resolver la asistencia.");
+      } finally {
+          setProcessingAttendance(null);
+      }
+  };
+
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center text-white">
@@ -163,6 +248,60 @@ export function CampaignLobby() {
     if (campaign.invite_code) {
       navigator.clipboard.writeText(campaign.invite_code);
       // Optional: Add toast notification here
+    }
+  };
+
+  const handleAttendanceToggle = async (userId: string, currentStatus: boolean) => {
+    // Optimistic Update (Only if we are not blocked/polling immediately)
+    // Actually, let's skip optimistic update for attendance to avoid flicker if polling hits first
+    // Or better, handle the state update after success to ensure consistency
+    // But user asked for Optimistic UI + robust polling.
+    // The flicker happens if: Optimistic -> Polling (Old Data) -> API Success -> Polling (New Data).
+    // Solution: We should ignore polling updates for this specific user while we are "saving".
+    
+    // For now, let's keep it simple: 
+    // 1. Optimistic Update
+    // 2. Call API
+    // 3. On Error: Revert
+    // 4. Polling will eventually confirm it. 
+    // To prevent flicker, the backend fix (commit) is the most important. 
+    // If backend is fast and correct, the "Old Data" polling window is tiny.
+    
+    setLobbyData(prev => {
+        if (!prev) return null;
+        return {
+            ...prev,
+            party: prev.party.map(m => 
+                m.user_id === userId 
+                    ? { ...m, attending_next_session: !currentStatus }
+                    : m
+            )
+        };
+    });
+
+    try {
+        const token = await getToken();
+        await axios.patch(`http://localhost:8000/campaigns/${id}/members/${userId}/attendance`, {
+            is_attending: !currentStatus
+        }, {
+            headers: { Authorization: `Bearer ${token}` }
+        });
+        // Success: Do nothing, state is already updated optimistically
+    } catch (err) {
+        console.error("Failed to update attendance", err);
+        // Revert on failure
+        setLobbyData(prev => {
+            if (!prev) return null;
+            return {
+                ...prev,
+                party: prev.party.map(m => 
+                    m.user_id === userId 
+                        ? { ...m, attending_next_session: currentStatus }
+                        : m
+                )
+            };
+        });
+        alert("Error al actualizar la asistencia.");
     }
   };
 
@@ -257,8 +396,18 @@ export function CampaignLobby() {
         );
 
       case 'party':
+        const attendees = party.filter(m => m.attendance_status === AttendanceStatus.CONFIRMED);
+        const pending = party.filter(m => m.attendance_status === AttendanceStatus.PENDING);
+        
+        // Sort party to put current user first
+        const sortedParty = [...party].sort((a, b) => {
+            if (a.user_id === user?.id) return -1;
+            if (b.user_id === user?.id) return 1;
+            return 0;
+        });
+
         return (
-          <div className="space-y-6 animate-in fade-in duration-300">
+          <div className="space-y-8 animate-in fade-in duration-300">
             {/* CTA for Players without Character */}
             {!is_gm && !hasCharacter && (
               <div className="bg-gradient-to-r from-indigo-900 to-purple-900 rounded-xl p-8 border border-indigo-500 shadow-2xl text-center relative overflow-hidden">
@@ -279,62 +428,216 @@ export function CampaignLobby() {
               </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {party.map((member) => (
-                <div 
-                  key={member.user_id} 
-                  className={`bg-gray-800 rounded-xl overflow-hidden border transition-all hover:shadow-xl ${
-                    member.role === 'GM' ? 'border-yellow-600/50' : 'border-gray-700 hover:border-gray-500'
-                  }`}
-                >
-                  {/* Member Header */}
-                  <div className={`p-4 flex justify-between items-center ${
-                    member.role === 'GM' ? 'bg-yellow-900/20' : 'bg-gray-900/50'
-                  }`}>
-                    <div className="flex items-center gap-3">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${
-                        member.role === 'GM' ? 'bg-yellow-600 text-black' : 'bg-gray-600 text-white'
-                      }`}>
-                        {member.role === 'GM' ? 'GM' : 'PJ'}
-                      </div>
-                      <div>
-                        <p className="font-semibold text-gray-200">{member.username}</p>
-                        <p className="text-xs text-gray-500">Unido el {new Date(member.joined_at).toLocaleDateString()}</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Character Info */}
-                  <div className="p-4">
-                    {member.character ? (
-                      <div className="flex gap-4">
-                         <div className="w-16 h-16 bg-gray-700 rounded-lg overflow-hidden flex-shrink-0 border border-gray-600">
-                            {member.character.image_url ? (
-                                <img src={member.character.image_url} alt={member.character.name} className="w-full h-full object-cover" />
-                            ) : (
-                                <div className="w-full h-full flex items-center justify-center text-gray-500">
-                                    <UserIcon size={24} />
+            {/* SECTION 0: PENDING REQUESTS (GM ONLY) */}
+            {is_gm && pending.length > 0 && (
+                <div className="bg-yellow-900/20 border border-yellow-700/50 rounded-xl p-6">
+                    <h3 className="text-lg font-bold text-yellow-400 mb-4 flex items-center gap-2">
+                        <Info size={20} /> Solicitudes Pendientes ({pending.length})
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {pending.map(member => (
+                            <div key={member.user_id} className="bg-gray-800 p-4 rounded-lg border border-yellow-700/30 flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-full bg-gray-700 overflow-hidden">
+                                         {member.character?.image_url ? (
+                                            <img src={member.character.image_url} alt={member.username} className="w-full h-full object-cover" />
+                                        ) : (
+                                            <div className="w-full h-full flex items-center justify-center text-gray-400">
+                                                <UserIcon size={16} />
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div>
+                                        <p className="font-bold text-sm text-gray-200">{member.character?.name || member.username}</p>
+                                        <p className="text-xs text-yellow-500">Solicita unirse</p>
+                                    </div>
                                 </div>
-                            )}
-                         </div>
-                         <div>
-                             <h4 className="font-bold text-white text-lg">{member.character.name}</h4>
-                             <button 
-                                onClick={() => navigate(`/character/${member.character!.id}`)}
-                                className="text-indigo-400 text-xs hover:text-indigo-300 mt-1 hover:underline"
-                             >
-                                Ver Hoja
-                             </button>
-                         </div>
-                      </div>
-                    ) : (
-                      <div className="h-16 flex items-center justify-center text-gray-500 italic text-sm bg-gray-900/30 rounded-lg border border-dashed border-gray-700">
-                        {member.role === 'GM' ? 'Game Master' : 'Sin Personaje'}
-                      </div>
-                    )}
-                  </div>
+                                <div className="flex gap-2">
+                                    <button 
+                                        onClick={() => handleAttendanceResolution(member.user_id, AttendanceStatus.CONFIRMED)}
+                                        className="p-2 bg-green-600 hover:bg-green-500 text-white rounded-lg transition-colors"
+                                        title="Aceptar"
+                                        disabled={processingAttendance === member.user_id}
+                                    >
+                                        <Check size={16} />
+                                    </button>
+                                    <button 
+                                        onClick={() => handleAttendanceResolution(member.user_id, AttendanceStatus.REJECTED)}
+                                        className="p-2 bg-red-600 hover:bg-red-500 text-white rounded-lg transition-colors"
+                                        title="Rechazar"
+                                        disabled={processingAttendance === member.user_id}
+                                    >
+                                        <X size={16} />
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
                 </div>
-              ))}
+            )}
+
+            {/* SECTION 1: ATTENDEES */}
+            <div className="bg-green-900/20 border border-green-800/50 rounded-xl p-6">
+                <h3 className="text-lg font-bold text-green-400 mb-4 flex items-center gap-2">
+                    <Check size={20} /> Asistentes Confirmados
+                </h3>
+                {attendees.length > 0 ? (
+                    <div className="flex flex-wrap gap-4">
+                        {attendees.map(member => (
+                            <div key={member.user_id} className="flex flex-col items-center group">
+                                <div className="w-14 h-14 rounded-full border-2 border-green-500/50 overflow-hidden shadow-lg shadow-green-900/20 group-hover:scale-105 transition-transform bg-gray-800">
+                                    {member.character?.image_url ? (
+                                        <img src={member.character.image_url} alt={member.username} className="w-full h-full object-cover" />
+                                    ) : (
+                                        <div className="w-full h-full flex items-center justify-center text-gray-400">
+                                            <UserIcon size={20} />
+                                        </div>
+                                    )}
+                                </div>
+                                <span className="text-xs font-medium text-gray-300 mt-2 text-center max-w-[80px] truncate">
+                                    {member.character?.name || member.username}
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <p className="text-gray-500 italic text-sm">Aún no hay confirmaciones para la próxima sesión.</p>
+                )}
+            </div>
+
+            <hr className="border-gray-800" />
+
+            {/* SECTION 2: ALL MEMBERS */}
+            <div>
+                <h3 className="text-lg font-bold text-gray-400 mb-4 flex items-center gap-2">
+                    <Users size={20} /> Todos los Miembros
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {sortedParty.map((member) => {
+                    const isMe = user?.id === member.user_id;
+                    return (
+                    <div 
+                    key={member.user_id} 
+                    className={`bg-gray-800 rounded-xl overflow-hidden border transition-all hover:shadow-xl ${
+                        isMe ? 'border-indigo-500 ring-1 ring-indigo-500' : 
+                        member.role === 'GM' ? 'border-yellow-600/50' : 'border-gray-700 hover:border-gray-500'
+                    }`}
+                    >
+                    {/* Member Header */}
+                    <div className={`p-4 flex justify-between items-center ${
+                        isMe ? 'bg-indigo-900/30' :
+                        member.role === 'GM' ? 'bg-yellow-900/20' : 'bg-gray-900/50'
+                    }`}>
+                        <div className="flex items-center gap-3">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${
+                            member.role === 'GM' ? 'bg-yellow-600 text-black' : 'bg-gray-600 text-white'
+                        }`}>
+                            {member.role === 'GM' ? 'GM' : 'PJ'}
+                        </div>
+                        <div>
+                            <p className="font-semibold text-gray-200">
+                                {member.username} {isMe && <span className="text-indigo-400 text-xs ml-1">(Tú)</span>}
+                            </p>
+                            <p className="text-xs text-gray-500">Unido el {new Date(member.joined_at).toLocaleDateString()}</p>
+                        </div>
+                        </div>
+                    </div>
+
+                    {/* Character Info */}
+                    <div className="p-4 space-y-4">
+                        {member.character ? (
+                        <div className="flex gap-4">
+                            <div className="w-16 h-16 bg-gray-700 rounded-lg overflow-hidden flex-shrink-0 border border-gray-600">
+                                {member.character.image_url ? (
+                                    <img src={member.character.image_url} alt={member.character.name} className="w-full h-full object-cover" />
+                                ) : (
+                                    <div className="w-full h-full flex items-center justify-center text-gray-500">
+                                        <UserIcon size={24} />
+                                    </div>
+                                )}
+                            </div>
+                            <div>
+                                <h4 className="font-bold text-white text-lg">{member.character.name}</h4>
+                                <button 
+                                    onClick={() => navigate(`/character/${member.character!.id}`)}
+                                    className="text-indigo-400 text-xs hover:text-indigo-300 mt-1 hover:underline"
+                                >
+                                    Ver Hoja
+                                </button>
+                            </div>
+                        </div>
+                        ) : (
+                        <div className="h-16 flex items-center justify-center text-gray-500 italic text-sm bg-gray-900/30 rounded-lg border border-dashed border-gray-700">
+                            {member.role === 'GM' ? 'Game Master' : 'Sin Personaje'}
+                        </div>
+                        )}
+
+                        {/* Attendance Toggle / Status */}
+                        <div className="pt-3 border-t border-gray-700 flex justify-between items-center">
+                            <span className="text-sm text-gray-400">Asistencia:</span>
+                            
+                            {/* Render different controls based on status and user role */}
+                            {(() => {
+                                const status = member.attendance_status;
+                                const isProcessed = status === AttendanceStatus.CONFIRMED || status === AttendanceStatus.REJECTED;
+                                
+                                // Only show controls for ME or if I am GM (GM can manage anyone if needed, but requirements say if not yours, hide option)
+                                // Actually, if it's NOT me, and I am NOT GM, I should see nothing or just status.
+                                // If I am GM, I see pending requests above, here maybe just status.
+                                
+                                if (!isMe && !is_gm) {
+                                     // Another player viewing someone else: Just show status if confirmed
+                                     if (status === AttendanceStatus.CONFIRMED) return <span className="text-green-500 text-sm font-bold">Asistirá</span>;
+                                     if (status === AttendanceStatus.DECLINED) return <span className="text-gray-500 text-sm">No Asiste</span>;
+                                     return <span className="text-gray-600 text-sm italic">...</span>;
+                                }
+
+                                if (!isMe && is_gm) {
+                                     // GM viewing someone else
+                                     if (status === AttendanceStatus.PENDING) return <span className="text-yellow-500 text-sm font-bold">Pendiente</span>;
+                                     if (status === AttendanceStatus.CONFIRMED) return <span className="text-green-500 text-sm font-bold">Confirmado</span>;
+                                     if (status === AttendanceStatus.REJECTED) return <span className="text-red-500 text-sm font-bold">Rechazado</span>;
+                                     if (status === AttendanceStatus.DECLINED) return <span className="text-gray-500 text-sm">No Asiste</span>;
+                                     return <span className="text-gray-500 text-sm">Sin respuesta</span>;
+                                }
+
+                                // Player View (Me)
+                                // If processed and not GM, show status text only
+                                if (isProcessed && !is_gm) {
+                                    if (status === AttendanceStatus.CONFIRMED) return <span className="text-green-500 text-sm font-bold">Confirmado (Asistes)</span>;
+                                    if (status === AttendanceStatus.REJECTED) return <span className="text-red-500 text-sm font-bold">Rechazado por GM</span>;
+                                }
+
+                                // Interactive Toggle for Me
+                                const isCheck = status === AttendanceStatus.CONFIRMED || status === AttendanceStatus.PENDING;
+                                
+                                return (
+                                    <div className="flex items-center gap-2">
+                                        {status === AttendanceStatus.PENDING && (
+                                            <span className="text-xs text-yellow-500 italic">Enviado</span>
+                                        )}
+                                        <button
+                                            onClick={() => handleAttendanceRequest(member.user_id, !isCheck)}
+                                            disabled={processingAttendance === member.user_id || (isProcessed && !is_gm)}
+                                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+                                                isCheck ? (status === AttendanceStatus.PENDING ? 'bg-yellow-600' : 'bg-green-600') : 'bg-gray-600'
+                                            } ${(processingAttendance === member.user_id || (isProcessed && !is_gm)) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                                        >
+                                            <span
+                                                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                                    isCheck ? 'translate-x-6' : 'translate-x-1'
+                                                }`}
+                                            />
+                                        </button>
+                                    </div>
+                                );
+                            })()}
+                        </div>
+                    </div>
+                    </div>
+                );
+                })}
+                </div>
             </div>
           </div>
         );

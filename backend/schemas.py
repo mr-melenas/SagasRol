@@ -26,7 +26,7 @@ class User(UserBase):
     email: Optional[str] = None
     avatar_url: Optional[str] = None
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class CampaignBase(BaseModel):
     name: str
@@ -46,8 +46,8 @@ class Campaign(CampaignBase):
     gm_id: str 
     invite_code: str = Field(..., serialization_alias="inviteCode")
     class Config:
-        orm_mode = True
-        allow_population_by_field_name = True
+        from_attributes = True
+        populate_by_name = True
 
 class CampaignJoin(BaseModel):
     inviteCode: str
@@ -57,6 +57,7 @@ class CampaignMember(BaseModel):
     username: Optional[str]
     role: str
     joined_at: Any
+    attendance_status: Optional[str] = None
     character: Optional[Dict[str, Any]] = None
 
 class CampaignNoteCreate(BaseModel):
@@ -114,7 +115,7 @@ class Character(CharacterBase):
     campaign_id: Optional[int] = None
     universe_id: Optional[int] = None
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class ItemBase(BaseModel):
     name: str
@@ -128,7 +129,7 @@ class Item(ItemBase):
     id: int
     campaign_id: int
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class InventoryItem(BaseModel):
     id: int
@@ -136,7 +137,7 @@ class InventoryItem(BaseModel):
     location: InventoryLocation
     quantity: int
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class InventoryUpdate(BaseModel):
     location: InventoryLocation
@@ -179,14 +180,14 @@ class CharacterSheetTemplate(CharacterSheetTemplateBase):
     id: str
     ownerId: str
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class Universe(UniverseBase):
     id: int
     gm_id: str
     sheetTemplate: Optional[CharacterSheetTemplate] = None
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class AssetType(str, enum.Enum): # Should match database Enum
     SCENE = "SCENE"
@@ -211,4 +212,4 @@ class Asset(AssetBase):
     id: int
     universe_id: int
     class Config:
-        orm_mode = True
+        from_attributes = True
