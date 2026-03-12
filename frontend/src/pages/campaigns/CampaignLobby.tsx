@@ -20,6 +20,8 @@ import {
 } from 'lucide-react';
 import { LobbyData, AttendanceStatus } from '../../types';
 import { CharacterAvatar } from '../../components/player/CharacterAvatar';
+import { NotesTab } from './tabs/NotesTab';
+import { LibraryTab } from './tabs/LibraryTab';
 
 type TabType = 'general' | 'party' | 'notes' | 'library';
 
@@ -642,22 +644,47 @@ export function CampaignLobby() {
 
       case 'notes':
         return (
-            <div className="flex flex-col items-center justify-center h-64 text-gray-500 bg-gray-800/50 rounded-xl border border-gray-700 border-dashed">
-                <ScrollText size={48} className="mb-4 opacity-50" />
-                <h3 className="text-lg font-semibold">Diario de Campaña</h3>
-                <p className="text-sm">Módulo en construcción.</p>
-                <p className="text-xs mt-2">Gestiona tu diario privado y lore compartido aquí.</p>
-            </div>
+          <NotesTab 
+            notes={lobbyData.notes} 
+            campaignId={campaign.id} 
+            is_gm={is_gm} 
+            hasCharacter={hasCharacter}
+            onUpdate={() => {
+                // Trigger a silent refresh
+                const fetchLobby = async () => {
+                    try {
+                        const token = await getToken();
+                        const response = await axios.get(`http://localhost:8000/campaigns/${id}/lobby`, {
+                            headers: { Authorization: `Bearer ${token}` }
+                        });
+                        setLobbyData(response.data);
+                    } catch (e) { console.error(e); }
+                };
+                fetchLobby();
+            }}
+          />
         );
 
       case 'library':
         return (
-            <div className="flex flex-col items-center justify-center h-64 text-gray-500 bg-gray-800/50 rounded-xl border border-gray-700 border-dashed">
-                <BookOpen size={48} className="mb-4 opacity-50" />
-                <h3 className="text-lg font-semibold">Biblioteca y Handouts</h3>
-                <p className="text-sm">Módulo en construcción.</p>
-                <p className="text-xs mt-2">Accede a mapas, documentos y reglas aquí.</p>
-            </div>
+          <LibraryTab 
+            handouts={lobbyData.handouts} 
+            campaignId={campaign.id} 
+            is_gm={is_gm}
+            onUpdate={() => {
+                // Trigger a silent refresh
+                const fetchLobby = async () => {
+                    try {
+                        const token = await getToken();
+                        const response = await axios.get(`http://localhost:8000/campaigns/${id}/lobby`, {
+                            headers: { Authorization: `Bearer ${token}` }
+                        });
+                        setLobbyData(response.data);
+                    } catch (e) { console.error(e); }
+                };
+                fetchLobby();
+            }}
+          />
         );
 
       default:

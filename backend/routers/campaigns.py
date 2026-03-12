@@ -211,10 +211,18 @@ def get_campaign_lobby(
 
     # Filter Notes and Handouts based on Role
     if is_gm:
-        notes = db.query(models.CampaignNote).filter(models.CampaignNote.campaign_id == campaign_id).all()
+        # GM: Only sees their own notes ("Notas de Master")
+        # User requested restriction: GM cannot see player diaries.
+        notes = db.query(models.CampaignNote).filter(
+            models.CampaignNote.campaign_id == campaign_id,
+            models.CampaignNote.author_id == current_user.id
+        ).all()
+        
+        # GM sees all handouts
         handouts = db.query(models.Handout).filter(models.Handout.campaign_id == campaign_id).all()
     else:
         # Player: Public notes OR own private notes
+        # Maintaining existing logic for players, but ensuring they can't see GM's private notes (already covered by is_private check or author check)
         notes = db.query(models.CampaignNote).filter(
             models.CampaignNote.campaign_id == campaign_id,
             (models.CampaignNote.is_private == False) | (models.CampaignNote.author_id == current_user.id)
@@ -250,25 +258,100 @@ def create_campaign_note(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
-    # Verify membership
+    campaign = db.query(models.Campaign).filter(models.Campaign.id == campaign_id).first()
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+
+    is_gm = campaign.gm_id == current_user.id
+
+    # Verify membership (or ownership)
     member = db.query(models.CampaignMember).filter(
         models.CampaignMember.campaign_id == campaign_id,
         models.CampaignMember.user_id == current_user.id
     ).first()
     
-    if not member:
+    if not member and not is_gm:
          raise HTTPException(status_code=403, detail="Not a member of this campaign")
 
     new_note = models.CampaignNote(
         campaign_id=campaign_id,
         author_id=current_user.id,
         content=note.content,
-        is_private=note.is_private
+        is_private=True # Always private per user requirement
     )
     db.add(new_note)
     db.commit()
     db.refresh(new_note)
     return new_note
+
+@router.post("/{campaign_id}/handouts/text", response_model=schemas.Handout)
+def create_handout_text(
+    campaign_id: int,
+    handout: schemas.HandoutCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    campaign = db.query(models.Campaign).filter(models.Campaign.id == campaign_id).first()
+    if not campaign or campaign.gm_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Only GM can create handouts")
+
+    new_handout = models.Handout(
+        campaign_id=campaign_id,
+        name=handout.name,
+        content=handout.content,
+        is_visible=handout.is_visible
+    )
+    db.add(new_handout)
+    db.commit()
+    db.refresh(new_handout)
+    return new_handout
+
+@router.patch("/{campaign_id}/notes/{note_id}", response_model=schemas.CampaignNote)
+def update_campaign_note(
+    campaign_id: int,
+    note_id: int,
+    note_update: schemas.CampaignNoteUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    note = db.query(models.CampaignNote).filter(models.CampaignNote.id == note_id, models.CampaignNote.campaign_id == campaign_id).first()
+    if not note:
+        raise HTTPException(status_code=404, detail="Note not found")
+    
+    # Check authorization: Author can edit. GM can edit ANY note? No, requirement says GM sees their own notes.
+    # But wait, earlier I restricted GET /lobby so GM only sees their own notes.
+    # So if GM tries to edit a player note via ID, they should probably be blocked or allowed if they are the author.
+    # The current logic is: if note.author_id != current_user.id => 403. This is correct for strict privacy.
+    
+    if note.author_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to edit this note")
+
+    if note_update.content is not None:
+        note.content = note_update.content
+    # Always enforce private
+    note.is_private = True
+
+    db.commit()
+    db.refresh(note)
+    return note
+
+@router.delete("/{campaign_id}/notes/{note_id}")
+def delete_campaign_note(
+    campaign_id: int,
+    note_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    note = db.query(models.CampaignNote).filter(models.CampaignNote.id == note_id, models.CampaignNote.campaign_id == campaign_id).first()
+    if not note:
+        raise HTTPException(status_code=404, detail="Note not found")
+    
+    if note.author_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to delete this note")
+
+    db.delete(note)
+    db.commit()
+    return {"message": "Note deleted"}
 
 @router.post("/{campaign_id}/handouts", response_model=schemas.Handout)
 async def create_handout(
@@ -328,6 +411,45 @@ def update_handout(
     db.commit()
     db.refresh(handout)
     return handout
+
+@router.patch("/{campaign_id}/handouts/{handout_id}/visibility", response_model=schemas.Handout)
+def toggle_handout_visibility(
+    campaign_id: int,
+    handout_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    campaign = db.query(models.Campaign).filter(models.Campaign.id == campaign_id).first()
+    if not campaign or campaign.gm_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Only GM can toggle visibility")
+
+    handout = db.query(models.Handout).filter(models.Handout.id == handout_id, models.Handout.campaign_id == campaign_id).first()
+    if not handout:
+        raise HTTPException(status_code=404, detail="Handout not found")
+
+    handout.is_visible = not handout.is_visible
+    db.commit()
+    db.refresh(handout)
+    return handout
+
+@router.delete("/{campaign_id}/handouts/{handout_id}")
+def delete_handout(
+    campaign_id: int,
+    handout_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    campaign = db.query(models.Campaign).filter(models.Campaign.id == campaign_id).first()
+    if not campaign or campaign.gm_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Only GM can delete handouts")
+
+    handout = db.query(models.Handout).filter(models.Handout.id == handout_id, models.Handout.campaign_id == campaign_id).first()
+    if not handout:
+        raise HTTPException(status_code=404, detail="Handout not found")
+
+    db.delete(handout)
+    db.commit()
+    return {"message": "Handout deleted"}
 
 class AttendanceRequest(schemas.BaseModel):
     is_attending: bool

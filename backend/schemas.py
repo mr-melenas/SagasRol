@@ -64,6 +64,10 @@ class CampaignNoteCreate(BaseModel):
     content: str
     is_private: bool = True
 
+class CampaignNoteUpdate(BaseModel):
+    content: Optional[str] = None
+    is_private: Optional[bool] = None
+
 class HandoutCreate(BaseModel):
     name: str
     content: str
