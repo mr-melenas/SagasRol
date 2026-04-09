@@ -114,6 +114,19 @@ class Campaign(Base):
     members = relationship("CampaignMember", back_populates="campaign")
     notes = relationship("CampaignNote", back_populates="campaign")
     handouts = relationship("Handout", back_populates="campaign")
+    assets = relationship("CampaignAsset", back_populates="campaign")
+
+class CampaignAsset(Base):
+    __tablename__ = "campaign_assets"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    campaign_id = Column(Integer, ForeignKey("campaigns.id"))
+    name = Column(String)
+    file_url = Column(String)
+    is_preselected = Column(Boolean, default=False)
+    tags = Column(ARRAY(String), default=list)
+
+    campaign = relationship("Campaign", back_populates="assets")
 
 class Character(Base):
     __tablename__ = "characters"

@@ -16,14 +16,16 @@ import {
   Edit2,
   Check,
   X,
-  Camera
+  Camera,
+  Image as ImageIcon
 } from 'lucide-react';
 import { LobbyData, AttendanceStatus } from '../../types';
 import { CharacterAvatar } from '../../components/player/CharacterAvatar';
 import { NotesTab } from './tabs/NotesTab';
 import { LibraryTab } from './tabs/LibraryTab';
+import { AssetsTab } from './tabs/AssetsTab';
 
-type TabType = 'general' | 'party' | 'notes' | 'library';
+type TabType = 'general' | 'party' | 'notes' | 'library' | 'assets';
 
 export function CampaignLobby() {
   const { id } = useParams<{ id: string }>();
@@ -687,6 +689,9 @@ export function CampaignLobby() {
           />
         );
 
+      case 'assets':
+        return <AssetsTab campaignId={campaign.id} is_gm={is_gm} />;
+
       default:
         return null;
     }
@@ -767,6 +772,7 @@ export function CampaignLobby() {
             { id: 'party', label: 'Grupo', icon: Users },
             { id: 'notes', label: 'Diario', icon: ScrollText },
             { id: 'library', label: 'Biblioteca', icon: BookOpen },
+            ...(is_gm ? [{ id: 'assets', label: 'Recursos', icon: ImageIcon }] : []),
           ].map((tab) => (
             <button
               key={tab.id}

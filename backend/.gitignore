@@ -2,6 +2,7 @@
 __pycache__/
 .trae/
 trae/
+../.trae/
 
 # C extensions
 *.so

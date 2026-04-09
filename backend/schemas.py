@@ -217,3 +217,32 @@ class Asset(AssetBase):
     universe_id: int
     class Config:
         from_attributes = True
+
+class CampaignAssetBase(BaseModel):
+    name: str
+    file_url: str
+    is_preselected: bool = False
+    tags: Optional[List[str]] = []
+
+class CampaignAssetCreate(BaseModel):
+    name: str
+    file_url: str
+    tags: Optional[List[str]] = []
+
+class CampaignAssetUpdate(BaseModel):
+    name: Optional[str] = None
+    tags: Optional[List[str]] = None
+
+class CampaignAsset(CampaignAssetBase):
+    id: int
+    campaign_id: int
+    class Config:
+        from_attributes = True
+
+class AssetCopyFromUniverse(BaseModel):
+    universe_asset_url: str
+    name: str
+
+class CampaignAssetsList(BaseModel):
+    campaign_assets: List[CampaignAsset]
+    universe_assets: List[Asset]

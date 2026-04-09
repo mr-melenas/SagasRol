@@ -318,11 +318,6 @@ def update_campaign_note(
     if not note:
         raise HTTPException(status_code=404, detail="Note not found")
     
-    # Check authorization: Author can edit. GM can edit ANY note? No, requirement says GM sees their own notes.
-    # But wait, earlier I restricted GET /lobby so GM only sees their own notes.
-    # So if GM tries to edit a player note via ID, they should probably be blocked or allowed if they are the author.
-    # The current logic is: if note.author_id != current_user.id => 403. This is correct for strict privacy.
-    
     if note.author_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized to edit this note")
 
@@ -575,3 +570,197 @@ def resolve_attendance(
     db.refresh(member)
     
     return {"message": "Attendance resolved", "status": member.attendance_status}
+
+# --- Asset Management Endpoints ---
+
+@router.get("/{campaign_id}/assets", response_model=schemas.CampaignAssetsList)
+def list_campaign_assets(
+    campaign_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    campaign = db.query(models.Campaign).filter(models.Campaign.id == campaign_id).first()
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+    
+    if campaign.gm_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Only GM can access assets")
+
+    campaign_assets = db.query(models.CampaignAsset).filter(models.CampaignAsset.campaign_id == campaign_id).all()
+    
+    universe_assets = []
+    if campaign.universe_id:
+        universe_assets = db.query(models.Asset).filter(models.Asset.universe_id == campaign.universe_id).all()
+
+    return {"campaign_assets": campaign_assets, "universe_assets": universe_assets}
+
+@router.post("/{campaign_id}/assets", response_model=schemas.CampaignAsset)
+async def upload_campaign_asset(
+    campaign_id: int,
+    name: str = Form(...),
+    file: UploadFile = File(...),
+    tags: str = Form("[]"), # JSON string for list of tags
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    import json
+    campaign = db.query(models.Campaign).filter(models.Campaign.id == campaign_id).first()
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+    
+    if campaign.gm_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Only GM can upload assets")
+
+    # Validate name unique in campaign
+    if db.query(models.CampaignAsset).filter(models.CampaignAsset.campaign_id == campaign_id, models.CampaignAsset.name == name).first():
+        raise HTTPException(status_code=400, detail="Asset name already exists in this campaign")
+
+    try:
+        parsed_tags = json.loads(tags)
+        if not isinstance(parsed_tags, list):
+             parsed_tags = []
+        if len(parsed_tags) > 10:
+             raise HTTPException(status_code=400, detail="Maximum 10 tags allowed")
+    except:
+        parsed_tags = []
+
+    try:
+        folder_path = f"campaigns/{campaign_id}/assets"
+        public_url = await upload_image_to_supabase(file, folder_path)
+        
+        # Ensure string
+        if not isinstance(public_url, str):
+             if hasattr(public_url, 'publicUrl'):
+                  public_url = public_url.publicUrl
+             elif isinstance(public_url, dict) and 'publicUrl' in public_url:
+                  public_url = public_url['publicUrl']
+             else:
+                  public_url = str(public_url)
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Asset upload failed: {str(e)}")
+
+    new_asset = models.CampaignAsset(
+        campaign_id=campaign_id,
+        name=name,
+        file_url=public_url,
+        is_preselected=False,
+        tags=parsed_tags
+    )
+    db.add(new_asset)
+    db.commit()
+    db.refresh(new_asset)
+    return new_asset
+
+@router.patch("/{campaign_id}/assets/{asset_id}", response_model=schemas.CampaignAsset)
+def update_campaign_asset(
+    campaign_id: int,
+    asset_id: int,
+    asset_update: schemas.CampaignAssetUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    campaign = db.query(models.Campaign).filter(models.Campaign.id == campaign_id).first()
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+    
+    if campaign.gm_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Only GM can update assets")
+
+    asset = db.query(models.CampaignAsset).filter(models.CampaignAsset.id == asset_id, models.CampaignAsset.campaign_id == campaign_id).first()
+    if not asset:
+        raise HTTPException(status_code=404, detail="Asset not found")
+
+    if asset_update.name is not None:
+        # Check uniqueness if name changed
+        if asset_update.name != asset.name:
+             if db.query(models.CampaignAsset).filter(models.CampaignAsset.campaign_id == campaign_id, models.CampaignAsset.name == asset_update.name).first():
+                  raise HTTPException(status_code=400, detail="Asset name already exists")
+        asset.name = asset_update.name
+
+    if asset_update.tags is not None:
+        if len(asset_update.tags) > 10:
+             raise HTTPException(status_code=400, detail="Maximum 10 tags allowed")
+        asset.tags = asset_update.tags
+
+    db.commit()
+    db.refresh(asset)
+    return asset
+
+@router.delete("/{campaign_id}/assets/{asset_id}")
+def delete_campaign_asset(
+    campaign_id: int,
+    asset_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    campaign = db.query(models.Campaign).filter(models.Campaign.id == campaign_id).first()
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+    
+    if campaign.gm_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Only GM can delete assets")
+
+    asset = db.query(models.CampaignAsset).filter(models.CampaignAsset.id == asset_id, models.CampaignAsset.campaign_id == campaign_id).first()
+    if not asset:
+        raise HTTPException(status_code=404, detail="Asset not found")
+
+    db.delete(asset)
+    db.commit()
+    return {"message": "Asset deleted"}
+
+@router.patch("/{campaign_id}/assets/{asset_id}/preselect", response_model=schemas.CampaignAsset)
+def toggle_asset_preselect(
+    campaign_id: int,
+    asset_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    campaign = db.query(models.Campaign).filter(models.Campaign.id == campaign_id).first()
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+    
+    if campaign.gm_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Only GM can manage assets")
+
+    asset = db.query(models.CampaignAsset).filter(models.CampaignAsset.id == asset_id, models.CampaignAsset.campaign_id == campaign_id).first()
+    if not asset:
+        raise HTTPException(status_code=404, detail="Asset not found")
+
+    asset.is_preselected = not asset.is_preselected
+    db.commit()
+    db.refresh(asset)
+    return asset
+
+@router.post("/{campaign_id}/assets/copy-from-universe", response_model=schemas.CampaignAsset)
+def copy_asset_from_universe(
+    campaign_id: int,
+    data: schemas.AssetCopyFromUniverse,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    campaign = db.query(models.Campaign).filter(models.Campaign.id == campaign_id).first()
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+    
+    if campaign.gm_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Only GM can copy assets")
+
+    # Check for name duplication
+    final_name = data.name
+    counter = 1
+    while db.query(models.CampaignAsset).filter(models.CampaignAsset.campaign_id == campaign_id, models.CampaignAsset.name == final_name).first():
+        final_name = f"{data.name} ({counter})"
+        counter += 1
+
+    new_asset = models.CampaignAsset(
+        campaign_id=campaign_id,
+        name=final_name,
+        file_url=data.universe_asset_url,
+        is_preselected=True,
+        tags=[] # Copy tags? Maybe later.
+    )
+    db.add(new_asset)
+    db.commit()
+    db.refresh(new_asset)
+    return new_asset
