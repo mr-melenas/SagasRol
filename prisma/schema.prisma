@@ -1,0 +1,246 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Enums
+enum UserRole {
+  GM
+  PLAYER
+}
+
+enum InventoryLocation {
+  EQUIPPED
+  BACKPACK
+  STASH
+}
+
+enum DowntimeStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum AssetType {
+  SCENE
+  NPC
+  ENEMY
+  ITEM
+}
+
+// Models
+model User {
+  id                String   @id // Clerk ID
+  username          String?
+  email             String?  @unique
+  first_name        String?
+  last_name         String?
+  profile_image_url String?
+  avatar_url        String? // Mantener por compatibilidad o eliminar si es redundante con profile_image_url
+  
+  // Relations
+  gm_campaigns   Campaign[]  @relation("GMCampaigns")
+  characters     Character[] @relation("PlayerCharacters")
+  universes      Universe[]  @relation("GMUniverses")
+  campaign_memberships CampaignMember[]
+  notes_authored CampaignNote[]
+
+  @@map("users")
+}
+
+model Universe {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?  @db.Text
+  cover_url   String?
+  gm_id       String
+  isPublic    Boolean  @default(true)
+  tags        String[]
+  
+  // Configuration for character sheet and default dice
+  // Example: { "default_dice": "d20", "attributes": ["Strength", "Agility"] }
+  rules_config Json?
+
+  sheetTemplateId String?
+  sheetTemplate   CharacterSheetTemplate? @relation(fields: [sheetTemplateId], references: [id])
+
+  // Relations
+  gm          User     @relation("GMUniverses", fields: [gm_id], references: [id])
+  assets      Asset[]
+  campaigns   Campaign[]
+  characters  Character[]
+
+  @@map("universes")
+}
+
+model CharacterSheetTemplate {
+  id        String   @id @default(uuid())
+  name      String   // Ej: "D&D 5e Estándar"
+  structure Json     // El array de bloques que crea tu builder
+  ownerId   String
+  
+  universes Universe[]
+
+  @@map("character_sheet_templates")
+}
+
+model Asset {
+  id          Int       @id @default(autoincrement())
+  name        String
+  image_url   String
+  type        AssetType
+  universe_id Int
+
+  // Relations
+  universe    Universe  @relation(fields: [universe_id], references: [id])
+
+  @@map("assets")
+}
+
+model Campaign {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?  @db.Text
+  inviteCode  String   @unique
+  gm_id       String
+  universe_id Int?     // Optional for now to support legacy campaigns
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  gm          User        @relation("GMCampaigns", fields: [gm_id], references: [id])
+  universe    Universe?   @relation(fields: [universe_id], references: [id])
+  characters  Character[]
+  items       Item[]
+  sessions    Session[]
+  members     CampaignMember[]
+  notes       CampaignNote[]
+  handouts    Handout[]
+  nextSessionAt DateTime?
+
+  @@map("campaigns")
+}
+
+model CampaignMember {
+  id         Int      @id @default(autoincrement())
+  campaignId Int
+  userId     String
+  role       String   @default("PLAYER") // "GM" o "PLAYER"
+  joinedAt   DateTime @default(now())
+
+  campaign   Campaign @relation(fields: [campaignId], references: [id])
+  user       User     @relation(fields: [userId], references: [id])
+
+  // Un usuario solo puede unirse una vez a la misma campaña
+  @@unique([campaignId, userId])
+  @@map("campaign_members")
+}
+
+model CampaignNote {
+  id         Int      @id @default(autoincrement())
+  campaignId Int
+  authorId   String
+  content    String   // Aquí guardaremos el texto enriquecido (HTML o Markdown)
+  isPrivate  Boolean  @default(true) // Si es true, solo lo ve el autor
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  campaign   Campaign @relation(fields: [campaignId], references: [id])
+  author     User     @relation(fields: [authorId], references: [id])
+
+  @@map("campaign_notes")
+}
+
+model Handout {
+  id         Int      @id @default(autoincrement())
+  campaignId Int
+  name       String
+  content    String
+  isVisible  Boolean  @default(false) // El GM decide cuándo revelarlo a los jugadores
+  createdAt  DateTime @default(now())
+
+  campaign   Campaign @relation(fields: [campaignId], references: [id])
+
+  @@map("handouts")
+}
+
+model Character {
+  id          Int      @id @default(autoincrement())
+  name        String
+  user_id     String
+  campaign_id Int?
+  universe_id Int?
+  stats       Json?    // e.g., {"strength": 10, "magic": 5}
+  image_url   String?
+
+  // Relations
+  player           User             @relation("PlayerCharacters", fields: [user_id], references: [id])
+  campaign         Campaign?        @relation(fields: [campaign_id], references: [id])
+  universe         Universe?        @relation(fields: [universe_id], references: [id])
+  inventory        Inventory[]
+  downtime_actions DowntimeAction[]
+
+  @@map("characters")
+}
+
+model Item {
+  id             Int     @id @default(autoincrement())
+  name           String
+  description    String?
+  campaign_id    Int
+  stats_modifier Json?   // e.g., {"strength": +2}
+
+  // Relations
+  campaign          Campaign    @relation(fields: [campaign_id], references: [id])
+  inventory_entries Inventory[]
+
+  @@map("items")
+}
+
+model Inventory {
+  id           Int               @id @default(autoincrement())
+  character_id Int
+  item_id      Int
+  location     InventoryLocation @default(BACKPACK)
+  quantity     Int               @default(1)
+
+  // Relations
+  character Character @relation(fields: [character_id], references: [id])
+  item      Item      @relation(fields: [item_id], references: [id])
+
+  @@map("inventory")
+}
+
+model Session {
+  id          Int      @id @default(autoincrement())
+  campaign_id Int
+  log         String?  @db.Text
+  date        DateTime @default(now())
+  summary     String?  @db.Text
+
+  // Relations
+  campaign Campaign @relation(fields: [campaign_id], references: [id])
+
+  @@map("sessions")
+}
+
+model DowntimeAction {
+  id           Int            @id @default(autoincrement())
+  character_id Int
+  action_type  String
+  input_data   String
+  status       DowntimeStatus @default(PENDING)
+  result       String?        @db.Text
+  created_at   DateTime       @default(now())
+
+  // Relations
+  character Character @relation(fields: [character_id], references: [id])
+
+  @@map("downtime_actions")
+}
